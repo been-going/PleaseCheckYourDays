@@ -1,7 +1,8 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { User } from '@prisma/client'; // Re-import User type
+import prisma from '../lib/prisma';
 
-const prisma = new PrismaClient();
+
 const router = express.Router();
 
 // Get all goals for the logged-in user

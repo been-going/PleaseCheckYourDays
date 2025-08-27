@@ -2,7 +2,8 @@ import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import morgan from "morgan";
-import { PrismaClient, Prisma, User } from "@prisma/client";
+import { Prisma, User } from "@prisma/client"; // Re-import Prisma and User types
+import prisma from "./lib/prisma";
 import passport from "./lib/passport";
 import authRoutes from "./routes/auth";
 import goalRoutes from "./routes/goals";
@@ -11,6 +12,8 @@ import statsRoutes from "./routes/stats";
 // Express Request 인터페이스 확장
 declare global {
   namespace Express {
+    type PrismaUser = import("@prisma/client").User;
+    interface User extends PrismaUser {}
     interface Request {
       user?: User;
     }
@@ -18,7 +21,7 @@ declare global {
 }
 
 const app = express();
-const prisma = new PrismaClient();
+
 
 app.use(
   cors({
@@ -494,7 +497,7 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ message: "Internal error", detail: err?.message });
 });
 
-const PORT = Number(process.env.PORT || 4000);
+const PORT = Number(process.env.PORT || 4001);
 app.listen(PORT, () => console.log(`API on http://localhost:${PORT}`));
 
 // 404

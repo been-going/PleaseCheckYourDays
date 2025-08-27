@@ -2,8 +2,8 @@
   "name": "habit-web",
   "private": true,
   "workspaces": [
-    "server",
-    "web"
+    "backend",
+    "frontend"
   ],
   "scripts": {
     "dev": "pnpm -r --parallel dev",

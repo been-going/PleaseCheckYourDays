@@ -1,7 +1,8 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { User } from '@prisma/client'; // Re-import User type
+import prisma from '../lib/prisma';
 
-const prisma = new PrismaClient();
+
 const router = express.Router();
 
 // GET /api/stats?year=YYYY&month=MM
