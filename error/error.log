@@ -1,0 +1,58 @@
+$ pnpm dev
+
+> habit-web@ dev E:\pleaseCheckTheList
+> pnpm -r --parallel dev
+
+Scope: 2 of 3 workspace projects
+server dev$ tsx watch src/index.ts
+web dev$ vite
+web dev:   VITE v7.1.2  ready in 248 ms
+web dev:   ➜  Local:   http://localhost:5173/
+web dev:   ➜  Network: use --host to expose
+server dev: API on http://localhost:4000
+server dev: [API /api/goals GET] Error fetching goals: PrismaClientKnownRequestError: 
+server dev: Invalid `prisma.goal.findMany()` invocation in
+server dev: E:\pleaseCheckTheList\server\src\routes\goals.ts:11:37
+server dev:    8 router.get('/', async (req, res) => {
+server dev:    9   const userId = req.user!.id;
+server dev:   10   try {
+server dev: → 11     const goals = await prisma.goal.findMany(
+server dev: The table `goal` does not exist in the current database.
+server dev:     at $n.handleRequestError (E:\pleaseCheckTheList\node_modules\.pnpm\@prisma+client@5.22.0_prisma@5.22.0\node_modules\@prisma\client\runtime\library.js:121:7315)
+server dev:     at $n.handleAndLogRequestError (E:\pleaseCheckTheList\node_modules\.pnpm\@prisma+client@5.22.0_prisma@5.22.0\node_modules\@prisma\client\runtime\library.js:121:6623)
+server dev:     at $n.request (E:\pleaseCheckTheList\node_modules\.pnpm\@prisma+client@5.22.0_prisma@5.22.0\node_modules\@prisma\client\runtime\library.js:121:6307)
+server dev:     at async l (E:\pleaseCheckTheList\node_modules\.pnpm\@prisma+client@5.22.0_prisma@5.22.0\node_modules\@prisma\client\runtime\library.js:130:9633)
+server dev:     at async <anonymous> (E:\pleaseCheckTheList\server\src\routes\goals.ts:11:19) {    
+server dev:   code: 'P2021',
+server dev:   clientVersion: '5.22.0',
+server dev:   meta: { modelName: 'Goal', table: 'goal' }
+server dev: }
+server dev: GET /api/goals 500 19.755 ms - 32
+server dev: [API /api/goals GET] Error fetching goals: PrismaClientKnownRequestError:
+server dev: Invalid `prisma.goal.findMany()` invocation in
+server dev: E:\pleaseCheckTheList\server\src\routes\goals.ts:11:37
+server dev:    8 router.get('/', async (req, res) => {
+server dev:    9   const userId = req.user!.id;
+server dev:   10   try {
+server dev: → 11     const goals = await prisma.goal.findMany(
+server dev: The table `goal` does not exist in the current database.
+server dev:     at $n.handleRequestError (E:\pleaseCheckTheList\node_modules\.pnpm\@prisma+client@5.22.0_prisma@5.22.0\node_modules\@prisma\client\runtime\library.js:121:7315)
+server dev:     at $n.handleAndLogRequestError (E:\pleaseCheckTheList\node_modules\.pnpm\@prisma+client@5.22.0_prisma@5.22.0\node_modules\@prisma\client\runtime\library.js:121:6623)
+server dev:     at $n.request (E:\pleaseCheckTheList\node_modules\.pnpm\@prisma+client@5.22.0_prisma@5.22.0\node_modules\@prisma\client\runtime\library.js:121:6307)
+server dev:     at async l (E:\pleaseCheckTheList\node_modules\.pnpm\@prisma+client@5.22.0_prisma@5.22.0\node_modules\@prisma\client\runtime\library.js:130:9633)
+server dev:     at async <anonymous> (E:\pleaseCheckTheList\server\src\routes\goals.ts:11:19) {    
+server dev:   code: 'P2021',
+server dev:   clientVersion: '5.22.0',
+server dev:   meta: { modelName: 'Goal', table: 'goal' }
+server dev: }
+server dev: GET /api/goals 500 5.657 ms - 32
+server dev: [API /api/goals POST] Full error object: {
+server dev:   "name": "PrismaClientKnownRequestError",
+server dev:   "code": "P2021",
+server dev:   "clientVersion": "5.22.0",
+server dev:   "meta": {
+server dev:     "modelName": "Goal",
+server dev:     "table": "goal"
+server dev:   }
+server dev: }
+server dev: POST /api/goals 500 5.524 ms - 31

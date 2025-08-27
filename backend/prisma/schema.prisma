@@ -1,0 +1,125 @@
+enum TemplateGroup {
+  MORNING
+  EXECUTE
+  EVENING
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  templates    Template[]
+  tasks        DailyTask[]
+  fixedCosts   FixedCost[]
+  daySummaries DaySummary[]
+  settings     Setting[]
+  goals        Goal[]
+}
+
+model DailyTask {
+  id         String   @id @default(cuid())
+  dateYMD    String
+  title      String
+  checked    Boolean  @default(false)
+  note       String?
+  value      Float?
+  weight     Int      @default(1)
+  isOneOff   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  templateId String?
+  template   Template? @relation(fields: [templateId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([dateYMD])
+  @@index([templateId])
+  @@index([userId])
+  @@unique([userId, dateYMD, templateId])
+}
+
+model Template {
+  id            String        @id @default(cuid())
+  title         String
+  group         TemplateGroup @default(MORNING)
+  order         Int           @default(0)
+  weight        Int           @default(1)
+  defaultActive Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  tasks DailyTask[]
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@unique([userId, title, group])
+}
+
+model DaySummary {
+  dateYMD     String
+  totalWeight Int
+  doneWeight  Int
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, dateYMD])
+  @@index([userId])
+}
+
+model Setting {
+  key   String
+  value String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, key])
+  @@index([userId])
+}
+
+model FixedCost {
+  id          String   @id @default(cuid())
+  name        String
+  amount      Int
+  paymentDate Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Goal {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  startDate   DateTime
+  targetDate  DateTime
+  progress    Int      @default(0)
+  isAchieved  Boolean  @default(false)
+
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
