@@ -1,7 +1,8 @@
 // TodayCombined.tsx - Fully refactored for useApi hook
 import { useMemo, useState, CSSProperties } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, Template, DailyTask as Task } from "../api/client";
+import { useApi } from "../api";
+import type { Template, DailyTask as Task } from "../api/client";
 
 type Group = "MORNING" | "EXECUTE" | "EVENING";
 
@@ -39,6 +40,7 @@ function isDone(t: {
 
 export default function TodayCombined() {
   const qc = useQueryClient();
+  const api = useApi();
 
   const [showNotes, setShowNotes] = useState(true);
   type MemoTarget =
@@ -55,11 +57,11 @@ export default function TodayCombined() {
 
   const qTpl = useQuery({
     queryKey: ["templates"],
-    queryFn: () => api<Template[]>("/api/templates"),
+    queryFn: api.getTemplates,
   });
   const qDay = useQuery({
     queryKey: ["tasks", dateYMD],
-    queryFn: () => api<{ tasks: Task[] }>(`/api/daily/tasks?date=${dateYMD}`),
+    queryFn: () => api.getDailyTasks(dateYMD),
   });
 
   const invalidateToday = () =>
@@ -74,7 +76,7 @@ export default function TodayCombined() {
 
   const mCreateTpl = useMutation({
     mutationFn: (p: { title: string; group: Group }) =>
-      api("/api/templates", { method: "POST", body: JSON.stringify(p) }),
+      api.createTemplate({ title: p.title, group: p.group }),
     onSuccess: () => {
       setNewTplTitle("");
       invalidateTemplates();
@@ -88,24 +90,19 @@ export default function TodayCombined() {
       group?: Group;
       defaultActive?: boolean;
     }) => {
-      const { id, ...data } = p;
-      return api(`/api/templates/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
+      const { id, ...rest } = p;
+      return api.updateTemplate(id, rest);
     },
     onSuccess: invalidateTemplates,
     onError: onMutationError,
   });
   const mDeleteTpl = useMutation({
-    mutationFn: (p: { id: string }) =>
-      api(`/api/templates/${p.id}`, { method: "DELETE" }),
+    mutationFn: (p: { id: string }) => api.deleteTemplate(p.id),
     onSuccess: invalidateTemplates,
     onError: onMutationError,
   });
   const mAddOneoff = useMutation({
-    mutationFn: (p: { title: string; dateYMD: string }) =>
-      api("/api/tasks", { method: "POST", body: JSON.stringify(p) }),
+    mutationFn: (p: { title: string; dateYMD: string }) => api.addOneoff(p),
     onSuccess: () => {
       setOneoffTitle("");
       invalidateToday();
@@ -113,7 +110,7 @@ export default function TodayCombined() {
     onError: onMutationError,
   });
   const mDeleteTask = useMutation({
-    mutationFn: (id: string) => api(`/api/tasks/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => api.deleteTask(id),
     onSuccess: invalidateToday,
     onError: onMutationError,
   });
@@ -122,20 +119,13 @@ export default function TodayCombined() {
       dateYMD: string;
       templateId: string;
       checked: boolean;
-    }) =>
-      api("/api/daily/check", {
-        method: "POST",
-        body: JSON.stringify(p),
-      }),
+    }) => api.upsertTaskFromTemplate(p),
     onSuccess: invalidateToday,
     onError: onMutationError,
   });
   const mNoteTemplate = useMutation({
     mutationFn: (p: { dateYMD: string; templateId: string; note: string }) =>
-      api("/api/daily/note", {
-        method: "POST",
-        body: JSON.stringify(p),
-      }),
+      api.upsertTaskNote(p),
     onSuccess: invalidateToday,
     onError: onMutationError,
   });
@@ -143,11 +133,7 @@ export default function TodayCombined() {
     mutationFn: (p: {
       id: string;
       data: { checked?: boolean; note?: string; value?: number };
-    }) =>
-      api(`/api/tasks/${p.id}`, {
-        method: "PATCH",
-        body: JSON.stringify(p.data),
-      }),
+    }) => api.updateTask(p.id, p.data),
     onSuccess: invalidateToday,
     onError: onMutationError,
   });
@@ -284,7 +270,10 @@ export default function TodayCombined() {
                   onChange={(e) => setOneoffTitle(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && oneoffTitle.trim()) {
-                      mAddOneoff.mutate({ title: oneoffTitle.trim(), dateYMD });
+                      mAddOneoff.mutate({
+                        title: oneoffTitle.trim(),
+                        dateYMD,
+                      });
                     }
                   }}
                 />

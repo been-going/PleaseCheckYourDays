@@ -1,104 +1,130 @@
-import { useState, useEffect } from 'react';
-import { useApi } from '../api'; // Import useApi
-import { StatsData } from '../api/client'; // Keep type import
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import './DashboardPage.css';
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+import { useState, useEffect } from "react";
+import { useApi } from "../api"; // Import useApi
+import { Link } from "react-router-dom";
+import { RoutineStat } from "../api/client"; // Keep type import
+import "./DashboardPage.css";
 
 export default function DashboardPage() {
   const api = useApi(); // Get the api client
-  const [stats, setStats] = useState<StatsData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [date, setDate] = useState(new Date());
+  const [routineStats, setRoutineStats] = useState<RoutineStat[] | null>(null);
+  const [routineSortBy, setRoutineSortBy] = useState("rate_desc");
+  const [routineLoading, setRoutineLoading] = useState(true);
+  const [routineError, setRoutineError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchStats();
-  }, [date, api]); // Add api to dependency array
+    const fetchRoutineStats = async () => {
+      setRoutineLoading(true);
+      setRoutineError(null);
+      try {
+        // Pass limit as undefined to get all routines
+        const fetchedRoutineStats = await api.getRoutineStats(
+          routineSortBy,
+          undefined
+        );
+        setRoutineStats(fetchedRoutineStats);
+      } catch (err) {
+        setRoutineError("루틴 통계 데이터를 불러오는 중 오류가 발생했습니다.");
+        console.error(err);
+      } finally {
+        setRoutineLoading(false);
+      }
+    };
 
-  const fetchStats = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const year = date.getFullYear();
-      const month = date.getMonth() + 1;
-      const fetchedStats = await api.getStats(year, month); // Use api.getStats
-      setStats(fetchedStats);
-    } catch (err) {
-      setError('통계 데이터를 불러오는 중 오류가 발생했습니다.');
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handlePrevMonth = () => {
-    setDate(new Date(date.getFullYear(), date.getMonth() - 1, 1));
-  };
-
-  const handleNextMonth = () => {
-    setDate(new Date(date.getFullYear(), date.getMonth() + 1, 1));
-  };
-
-  const taskCompletionData = stats ? [
-    { name: '완료', value: stats.taskStats.completed },
-    { name: '미완료', value: stats.taskStats.total - stats.taskStats.completed },
-  ] : [];
+    fetchRoutineStats();
+  }, [routineSortBy, api]);
 
   return (
     <div className="dashboard-page-container">
       <header className="page-header">
-        <h1>월별 대시보드</h1>
-        <div className="month-selector">
-          <button onClick={handlePrevMonth}>&lt; 이전 달</button>
-          <h2>{`${date.getFullYear()}년 ${date.getMonth() + 1}월`}</h2>
-          <button onClick={handleNextMonth}>다음 달 &gt;</button>
-        </div>
+        <h1>대시보드</h1>
       </header>
 
-      {isLoading && <p>데이터를 불러오는 중...</p>}
-      {error && <p className="error-message">{error}</p>}
-
-      {stats && !isLoading && (
-        <div className="stats-grid">
-          <div className="stat-card">
-            <h3>태스크 완료율</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie data={taskCompletionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} fill="#8884d8" label>
-                  {taskCompletionData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-            <p>{stats.taskStats.total}개 중 {stats.taskStats.completed}개 완료 ({stats.taskStats.completionRate.toFixed(1)}%)</p>
+      <div className="stats-grid">
+        <div className="stat-card">
+          <h3>나의 루틴들</h3>
+          <div
+            style={{ width: "100%", marginBottom: "1rem", textAlign: "right" }}
+          >
+            <label htmlFor="routine-sort" style={{ marginRight: "8px" }}>
+              정렬:
+            </label>
+            <select
+              id="routine-sort"
+              value={routineSortBy}
+              onChange={(e) => setRoutineSortBy(e.target.value)}
+              className="btn" // Use existing button style
+            >
+              <option value="rate_desc">성공률 높은 순</option>
+              <option value="rate_asc">성공률 낮은 순</option>
+              <option value="date_desc">최신 생성 순</option>
+              <option value="date_asc">오래된 순</option>
+            </select>
           </div>
-
-          <div className="stat-card">
-            <h3>카테고리별 태스크</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={stats.categoryStats} layout="vertical">
-                <XAxis type="number" />
-                <YAxis type="category" dataKey="name" width={80} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#82ca9d" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="stat-card">
-            <h3>고정비 총액</h3>
-            <div className="fixed-cost-summary">
-              <span>{stats.fixedCostStats.count}개 항목</span>
-              <strong>{stats.fixedCostStats.total.toLocaleString()}원</strong>
-            </div>
-          </div>
+          {routineLoading && <p>로딩 중...</p>}
+          {routineError && <p className="error-message">{routineError}</p>}
+          {routineStats && !routineLoading && (
+            <ul
+              style={{
+                width: "100%",
+                listStyle: "none",
+                padding: 0,
+                margin: 0,
+              }}
+            >
+              {routineStats.length > 0 ? (
+                routineStats.map((routine) => (
+                  <Link
+                    to={`/routines/${routine.id}`}
+                    key={routine.id}
+                    className="routine-link"
+                  >
+                    <li className="routine-item">
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <strong
+                          style={{
+                            flex: 1,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {routine.title}
+                        </strong>
+                        <span
+                          style={{
+                            fontWeight: "bold",
+                            color: "#0088FE",
+                            marginLeft: "16px",
+                          }}
+                        >
+                          {routine.successRate.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "0.8rem", color: "#666" }}>
+                        <span>
+                          {routine.doneCount} / {routine.totalDays}일 성공
+                        </span>
+                        <span style={{ marginLeft: "10px", float: "right" }}>
+                          시작:{" "}
+                          {new Date(routine.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </li>
+                  </Link>
+                ))
+              ) : (
+                <p>표시할 루틴이 없습니다.</p>
+              )}
+            </ul>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

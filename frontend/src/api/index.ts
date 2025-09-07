@@ -1,15 +1,16 @@
-import { useAuth } from '../context/AuthContext';
-import * as realApi from './client';
-import { guestStoreApi } from './guestStore';
+import { useMemo } from "react";
+import * as client from "./client";
 
-// The guest API doesn't implement all functions, so we fall back to the real API.
-// In a real scenario, the guest API should be more complete or handle the missing functions gracefully.
-const guestApi = {
-  ...realApi,
-  ...guestStoreApi,
-};
-
+/**
+ * Provides a memoized API client object that includes all functions from client.ts.
+ * This hook ensures that components don't re-render unnecessarily due to
+ * the API object being recreated on every render.
+ * By centralizing API access through this hook, we ensure all components
+ * use a consistent, complete, and authenticated API client.
+ */
 export const useApi = () => {
-  const { isGuest } = useAuth();
-  return isGuest ? guestApi : realApi;
+  // NOTE: The previous implementation had complex guest-mode logic which was
+  // causing inconsistencies and errors. This has been simplified to always
+  // return the real, full API client.
+  return useMemo(() => client, []);
 };

@@ -1,70 +1,70 @@
-import { Routes, Route, Link, Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
-import { useEffect } from 'react';
+import {
+  Routes,
+  Route,
+  Link,
+  Navigate,
+  Outlet,
+  useLocation,
+} from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
 
 // Import Pages
-import TodayCombined from './pages/TodayCombined';
-import Calendar from './pages/Calendar';
-import { FixedCosts } from './pages/FixedCosts';
-import LoginPage from './pages/LoginPage';
-import SignupPage from './pages/SignupPage';
-import GoalsPage from './pages/GoalsPage';
-import DashboardPage from './pages/DashboardPage';
+import TodayCombined from "./pages/TodayCombined";
+import Calendar from "./pages/Calendar";
+import { FixedCosts } from "./pages/FixedCosts";
+import LoginPage from "./pages/LoginPage";
+import SignupPage from "./pages/SignupPage";
+import DashboardPage from "./pages/DashboardPage";
+import RoutineDetailPage from "./pages/RoutineDetailPage";
 
 // 1. Protected Route Component
-// Renders child routes if the user is authenticated or a guest.
-// Waits for the initial authentication check to complete.
 const ProtectedRoute = () => {
-  const { isAuthLoading } = useAuth();
+  const { isAuthLoading, isAuthenticated } = useAuth();
 
-  // While checking auth state, render nothing.
   if (isAuthLoading) {
-    return null;
+    return null; // Or a loading spinner
   }
 
-  // After auth check, render the main app content (for both users and guests).
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
   return <Outlet />;
 };
 
 // 2. Main Layout Component
-// Contains the navigation bar and dynamic auth buttons.
 const AppLayout = () => {
-  const { isAuthenticated, logout } = useAuth();
+  const { logout } = useAuth();
   const location = useLocation();
+
+  const getLinkClass = (path: string) => {
+    return location.pathname === path ? "btn active" : "btn";
+  };
 
   return (
     <div className="container">
       <nav className="toolbar">
-        <Link to="/" className={`btn ${location.pathname === '/' ? 'active' : ''}`}>
+        <Link to="/today" className={getLinkClass("/today")}>
           오늘
         </Link>
-        <Link to="/calendar" className={`btn ${location.pathname === '/calendar' ? 'active' : ''}`}>
+        <Link to="/calendar" className={getLinkClass("/calendar")}>
           달력
         </Link>
-        <Link to="/fixed-costs" className={`btn ${location.pathname === '/fixed-costs' ? 'active' : ''}`}>
-          고정비
-        </Link>
-        <Link to="/goals" className={`btn ${location.pathname === '/goals' ? 'active' : ''}`}>
-          목표
-        </Link>
-        <Link to="/dashboard" className={`btn ${location.pathname === '/dashboard' ? 'active' : ''}`}>
+        <Link to="/dashboard" className={getLinkClass("/dashboard")}>
           대시보드
         </Link>
-        
-        <div style={{ marginLeft: 'auto' }}>
-          {isAuthenticated ? (
-            <button className="btn" onClick={logout}>
-              로그아웃
-            </button>
-          ) : (
-            <>
-              <Link to="/login" className="btn">로그인</Link>
-              <Link to="/signup" className="btn">회원가입</Link>
-            </>
-          )}
+        <Link to="/fixed-costs" className={getLinkClass("/fixed-costs")}>
+          고정비
+        </Link>
+        <div style={{ marginLeft: "auto" }}>
+          <button className="btn" onClick={logout}>
+            로그아웃
+          </button>
         </div>
       </nav>
-      <Outlet /> {/* Child routes will be rendered here */}
+      <main>
+        <Outlet /> {/* Child routes will be rendered here */}
+      </main>
     </div>
   );
 };
@@ -79,12 +79,15 @@ export default function App() {
 
       {/* Main application routes are protected */}
       <Route element={<ProtectedRoute />}>
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<TodayCombined />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/fixed-costs" element={<FixedCosts />} />
-          <Route path="/goals" element={<GoalsPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/" element={<AppLayout />}>
+          <Route index element={<Navigate to="/today" replace />} />
+          <Route path="today" element={<TodayCombined />} />
+          <Route path="calendar" element={<Calendar />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="routines/:routineId" element={<RoutineDetailPage />} />
+          <Route path="fixed-costs" element={<FixedCosts />} />
+          {/* Templates route can be added here if needed in the future */}
+          {/* <Route path="templates" element={<Templates />} /> */}
         </Route>
       </Route>
 

@@ -1,42 +1,35 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client";
+import { useApi } from "../api";
+import type { DailyTask, DailySummary } from "../api/client";
 
-type DailyTask = {
-  id: string;
-  dateYMD: string;
-  title: string;
-  weight: number;
-  isOneOff: boolean;
-  checked: boolean;
-  note?: string;
-  value?: number;
-};
-
-type Summary = { dateYMD: string; totalWeight: number; doneWeight: number };
+type Summary = DailySummary;
 
 export default function Today() {
   const qc = useQueryClient();
+  const api = useApi();
   const q = useQuery({
     queryKey: ["today"],
-    queryFn: () =>
-      api<{ dateYMD: string; tasks: DailyTask[]; summary: Summary }>(
-        "/api/daily/init"
-      ),
+    queryFn: api.initToday,
   });
 
   const toggle = useMutation({
     mutationFn: (p: { id: string; checked: boolean }) =>
-      api(`/api/tasks/${p.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ checked: p.checked }),
-      }),
+      api.updateTask(p.id, { checked: p.checked }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["today"] }),
   });
 
   const addOneOff = useMutation({
     mutationFn: (title: string) =>
-      api("/api/tasks", { method: "POST", body: JSON.stringify({ title }) }),
+      api.addOneoff({ title, dateYMD: q.data!.dateYMD }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["today"] }),
+  });
+
+  const updateNote = useMutation({
+    mutationFn: (p: { id: string; note: string }) =>
+      api.updateTask(p.id, { note: p.note }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["today"] });
+    },
   });
 
   if (q.isLoading) return <div>로딩...</div>;
@@ -51,7 +44,7 @@ export default function Today() {
     <div>
       <h2>오늘 · {ratio}%</h2>
       <ul style={{ listStyle: "none", padding: 0 }}>
-        {tasks.map((t) => (
+        {tasks.map((t: DailyTask) => (
           <li
             key={t.id}
             style={{
@@ -75,10 +68,7 @@ export default function Today() {
                   t.note || ""
                 );
                 if (note !== null) {
-                  api(`/api/tasks/${t.id}`, {
-                    method: "PATCH",
-                    body: JSON.stringify({ note }),
-                  }).then(() => qc.invalidateQueries({ queryKey: ["today"] }));
+                  updateNote.mutate({ id: t.id, note });
                 }
               }}
             >

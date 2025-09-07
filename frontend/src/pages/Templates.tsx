@@ -1,26 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client";
+import { useApi } from "../api";
+import type { Template as ITemplate } from "../api/client";
 
-type Template = {
-  id: string;
-  title: string;
-  defaultActive: boolean;
-  weight: number;
-  order: number;
-};
+type Template = ITemplate;
 
 export default function Templates() {
   const qc = useQueryClient();
+  const api = useApi();
   const list = useQuery({
     queryKey: ["templates"],
-    queryFn: () => api<Template[]>("/api/templates"),
+    queryFn: api.getTemplates,
   });
   const add = useMutation({
     mutationFn: (title: string) =>
-      api("/api/templates", {
-        method: "POST",
-        body: JSON.stringify({ title }),
-      }),
+      api.createTemplate({ title, group: "EXECUTE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["templates"] }),
   });
 
@@ -31,7 +24,7 @@ export default function Templates() {
     <div>
       <h3>고정 루틴</h3>
       <ul>
-        {list.data!.map((t) => (
+        {(list.data as Template[] | undefined)?.map((t) => (
           <li key={t.id}>
             {t.title} {t.defaultActive ? "· 활성" : ""}
           </li>

@@ -54,15 +54,13 @@ function ymdKST(d = new Date()) {
 }
 
 function isDone(t: {
-  checked: boolean;
+  checked: boolean | number; // Raw query can return 1/0 for boolean
   note?: string | null;
   value?: number | null;
 }) {
-  return !!(
-    t.checked ||
-    (t.note && t.note.trim().length > 0) ||
-    typeof t.value === "number"
-  );
+  // A task is considered "done" only if it is explicitly checked.
+  // Notes or values no longer count towards completion for the summary percentage.
+  return !!t.checked;
 }
 
 function monthRange(ym: string) {
@@ -332,7 +330,7 @@ app.post(
   auth,
   safe(async (req, res) => {
     const { title, dateYMD, weight = 1 } = req.body;
-    if (!title) return res.status(400).json({ message: "title required" });
+    if (!title) return res.status(400).json({ message: "title is required" });
     const ymd = dateYMD || ymdKST();
     const t = await prisma.dailyTask.create({
       data: {
@@ -541,6 +539,137 @@ app.get(
     });
     const yearlyMatrixData = await Promise.all(matrixPromises);
     res.json({ templates, yearlyMatrixData });
+  })
+);
+
+app.get(
+  "/api/dashboard/routines",
+  auth,
+  safe(async (req, res) => {
+    const { sortBy = "rate_desc", limit } = req.query;
+    const userId = req.user!.id;
+
+    // Corrected Raw Query for MySQL
+    const routineStats: any[] = await prisma.$queryRaw`
+      SELECT
+        t.id,
+        t.title,
+        t.createdAt,
+        CAST((
+          SELECT COUNT(DISTINCT dt.dateYMD)
+          FROM \`DailyTask\` dt
+          WHERE
+            dt.templateId = t.id AND
+            dt.checked = TRUE
+        ) AS SIGNED) AS "doneCount"
+      FROM \`Template\` t
+      WHERE t.userId = ${userId}
+    `;
+
+    const today = new Date();
+    const routines = routineStats.map((r) => {
+      const createdAt = new Date(r.createdAt);
+
+      const start = new Date(
+        Date.UTC(
+          createdAt.getUTCFullYear(),
+          createdAt.getUTCMonth(),
+          createdAt.getUTCDate()
+        )
+      );
+      const end = new Date(
+        Date.UTC(
+          today.getUTCFullYear(),
+          today.getUTCMonth(),
+          today.getUTCDate()
+        )
+      );
+
+      const timeDiff = end.getTime() - start.getTime();
+      const totalDays = Math.max(
+        1,
+        Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1
+      );
+
+      const doneCount = Number(r.doneCount || 0);
+      const successRate = totalDays > 0 ? (doneCount / totalDays) * 100 : 0;
+
+      return {
+        id: r.id,
+        title: r.title,
+        createdAt: createdAt.toISOString(),
+        successRate,
+        totalDays,
+        doneCount,
+      };
+    });
+
+    routines.sort((a, b) => {
+      switch (sortBy) {
+        case "rate_asc":
+          return a.successRate - b.successRate;
+        case "date_desc":
+          return (
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        case "date_asc":
+          return (
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+        case "rate_desc":
+        default:
+          return b.successRate - a.successRate;
+      }
+    });
+
+    const limitNum = limit ? parseInt(String(limit), 10) : undefined;
+    res.json(limitNum ? routines.slice(0, limitNum) : routines);
+  })
+);
+
+app.get(
+  "/api/routines/:id",
+  auth,
+  safe(async (req, res) => {
+    const { id } = req.params;
+    const userId = req.user!.id;
+
+    const template = await prisma.template.findFirst({
+      where: { id, userId },
+    });
+
+    if (!template) {
+      return res.status(404).json({ message: "Routine not found" });
+    }
+
+    // Use a raw query to fetch tasks to ensure consistency with dashboard
+    const tasks: any[] = await prisma.$queryRaw`
+      SELECT dateYMD, checked, note, value
+      FROM \`DailyTask\`
+      WHERE userId = ${userId} AND templateId = ${id}
+      ORDER BY dateYMD ASC
+    `;
+
+    const completionData = tasks
+      .filter(isDone) // Now correctly filters by checked status only
+      .map((task) => {
+        let level = 1; // Base level for just being checked
+        if (task.note && task.note.trim().length > 0) level = 2;
+        if (typeof task.value === "number") level = 3; // Highest level for having a value
+        return {
+          date: task.dateYMD,
+          level,
+          note: task.note,
+          value: task.value,
+        };
+      });
+
+    res.json({
+      id: template.id,
+      title: template.title,
+      createdAt: template.createdAt,
+      completionData,
+    });
   })
 );
 
