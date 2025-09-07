@@ -187,3 +187,13 @@
 .heatmap-tooltip-content div:not(:first-child) {
   margin-top: 0.25rem;
 }
+
+.routine-percentage {
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 12px; /* Pill shape */
+  font-size: 0.8rem;
+  min-width: 50px;
+  text-align: center;
+  display: inline-block;
+}

@@ -65,6 +65,11 @@
   box-shadow: 0 0 0 2px var(--accent);
 }
 
+.calendar-day.today {
+  outline: 2px solid var(--accent-glow, #0ea5e9);
+  outline-offset: -2px;
+}
+
 .calendar-day.today .day-number {
   color: var(--accent);
   font-weight: 900;
@@ -257,5 +262,17 @@
   to {
     transform: translateY(0);
     opacity: 1;
+  }
+}
+
+/* --- Responsive Styles --- */
+@media (max-width: 900px) {
+  .calendar-container {
+    grid-template-columns: 1fr; /* Stack columns on smaller screens */
+  }
+
+  .calendar-sidebar {
+    position: relative; /* Un-stick the sidebar */
+    top: auto;
   }
 }

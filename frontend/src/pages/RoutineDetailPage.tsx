@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useApi } from "../api";
+import { getStyleForPercentage } from "../utils/colorUtils";
 import "./RoutineDetailPage.css";
 
 const MONTHS = [
@@ -263,8 +264,14 @@ export default function RoutineDetailPage() {
           <h1>{routineDetail.title}</h1>
           <p style={{ margin: 0, color: "#aaa" }}>
             시작일: {new Date(routineDetail.createdAt).toLocaleDateString()} /
-            성공률: {successRate.toFixed(1)}% ({completionMap.size}/{totalDays}
-            일)
+            성공률:{" "}
+            <span
+              className="routine-percentage"
+              style={getStyleForPercentage(successRate)}
+            >
+              {successRate.toFixed(1)}%
+            </span>{" "}
+            ({completionMap.size}/{totalDays} 일)
           </p>
         </div>
       </header>

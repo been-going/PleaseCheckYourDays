@@ -3,6 +3,7 @@ import { useMemo, useState, CSSProperties } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api";
 import type { Template, DailyTask as Task } from "../api/client";
+import { getStyleForPercentage } from "../utils/colorUtils";
 
 type Group = "MORNING" | "EXECUTE" | "EVENING";
 
@@ -173,27 +174,6 @@ export default function TodayCombined() {
 
   const isLoading = qTpl.isLoading || qDay.isLoading;
 
-  function colorForPct(p: number) {
-    if (p < 33) return "#ef4444";
-    if (p < 66) return "#f59e0b";
-    return "#22c55e";
-  }
-  function glowForPct(p: number) {
-    if (p < 33) return "0 0 .6rem rgba(239,68,68,.35)";
-    if (p < 66) return "0 0 .6rem rgba(245,158,11,.35)";
-    return "0 0 .6rem rgba(34,197,94,.45)";
-  }
-  function barStyleForPct(p: number): CSSProperties {
-    return {
-      width: `${p}%`,
-      background: colorForPct(p),
-      boxShadow: glowForPct(p),
-    };
-  }
-  function badgeStyleForPct(p: number): CSSProperties {
-    return { background: colorForPct(p) };
-  }
-
   async function saveMemo() {
     if (!memoTarget) return;
     try {
@@ -239,13 +219,13 @@ export default function TodayCombined() {
               <h3>오늘의 체크리스트</h3>
               <div className="row" style={{ gap: 8, alignItems: "center" }}>
                 <div className="tag">{dateYMD}</div>
-                <div className="tag" style={badgeStyleForPct(pct)}>
+                <div className="tag" style={getStyleForPercentage(pct)}>
                   {pct}%
                 </div>
               </div>
             </div>
             <div className="progress" aria-label="progress">
-              <i style={barStyleForPct(pct)} />
+              <i style={{ width: `${pct}%`, ...getStyleForPercentage(pct) }} />
             </div>
             <div style={{ color: "var(--muted)", marginTop: 6 }}>
               {done} / {total} 완료

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useApi } from "../api"; // Import useApi
 import { Link } from "react-router-dom";
 import { RoutineStat } from "../api/client"; // Keep type import
+import { getStyleForPercentage } from "../utils/colorUtils";
 import "./DashboardPage.css";
 
 export default function DashboardPage() {
@@ -97,11 +98,8 @@ export default function DashboardPage() {
                           {routine.title}
                         </strong>
                         <span
-                          style={{
-                            fontWeight: "bold",
-                            color: "#0088FE",
-                            marginLeft: "16px",
-                          }}
+                          className="routine-percentage"
+                          style={getStyleForPercentage(routine.successRate)}
                         >
                           {routine.successRate.toFixed(1)}%
                         </span>

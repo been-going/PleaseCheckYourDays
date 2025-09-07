@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api";
 import type { DailyTask, Template as ITemplate } from "../api/client";
+import { getStyleForPercentage } from "../utils/colorUtils";
 import "./Calendar.css";
 
 // --- Types ---
@@ -30,13 +31,6 @@ function firstOfMonth(d: Date) {
 function lastOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0);
 }
-
-const getProgressBarColor = (pct: number) => {
-  if (pct < 33) return "#ef4444";
-  if (pct < 66) return "#f59e0b";
-  if (pct >= 100) return "#84cc16";
-  return "#22c55e";
-};
 
 // --- Sub-components ---
 
@@ -329,7 +323,7 @@ export default function Calendar() {
                       className="day-progress-bar"
                       style={{
                         width: `${pct}%`,
-                        backgroundColor: getProgressBarColor(pct),
+                        background: getStyleForPercentage(pct).background,
                       }}
                     />
                   </div>
