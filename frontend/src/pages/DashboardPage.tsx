@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { getStats, StatsData } from '../api/client';
+import { useApi } from '../api'; // Import useApi
+import { StatsData } from '../api/client'; // Keep type import
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import './DashboardPage.css';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function DashboardPage() {
+  const api = useApi(); // Get the api client
   const [stats, setStats] = useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -13,7 +15,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchStats();
-  }, [date]);
+  }, [date, api]); // Add api to dependency array
 
   const fetchStats = async () => {
     setIsLoading(true);
@@ -21,7 +23,7 @@ export default function DashboardPage() {
     try {
       const year = date.getFullYear();
       const month = date.getMonth() + 1;
-      const fetchedStats = await getStats(year, month);
+      const fetchedStats = await api.getStats(year, month); // Use api.getStats
       setStats(fetchedStats);
     } catch (err) {
       setError('통계 데이터를 불러오는 중 오류가 발생했습니다.');

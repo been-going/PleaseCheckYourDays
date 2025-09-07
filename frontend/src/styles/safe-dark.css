@@ -197,3 +197,17 @@ select.btn {
   flex-direction: column;
   gap: 4px;
 }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+td, th {
+  border: 1px solid var(--border);
+  padding: 10px 14px;
+  text-align: left;
+}
+th {
+  font-weight: 600;
+  background: rgba(255,255,255,0.02);
+}

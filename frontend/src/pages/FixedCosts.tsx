@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getFixedCosts, addFixedCost, deleteFixedCost, FixedCost } from '../api/client';
+import { useApi } from '../api'; // Import useApi
+import { FixedCost } from '../api/client'; // Keep type import
 
 export function FixedCosts() {
+  const api = useApi(); // Get the api client
   const [costs, setCosts] = useState<FixedCost[]>([]);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +18,7 @@ export function FixedCosts() {
     try {
       setLoading(true);
       setError(null);
-      const data = await getFixedCosts();
+      const data = await api.getFixedCosts(); // Use api.getFixedCosts
       setCosts(data.sort((a, b) => a.paymentDate - b.paymentDate));
       const sum = data.reduce((acc, cost) => acc + cost.amount, 0);
       setTotal(sum);
@@ -26,11 +28,11 @@ export function FixedCosts() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [api]); // Add api to dependency array
 
   useEffect(() => {
     fetchCosts();
-  }, [fetchCosts]);
+  }, [fetchCosts, api]); // Add api to dependency array
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +49,7 @@ export function FixedCosts() {
     }
 
     try {
-      await addFixedCost({ name, amount: amountNum, paymentDate: dateNum });
+      await api.addFixedCost({ name, amount: amountNum, paymentDate: dateNum }); // Use api.addFixedCost
       setName('');
       setAmount('');
       setPaymentDate('');
@@ -61,7 +63,7 @@ export function FixedCosts() {
   const handleDelete = async (id: string) => {
     if (window.confirm('정말로 이 항목을 삭제하시겠습니까?')) {
       try {
-        await deleteFixedCost(id);
+        await api.deleteFixedCost(id); // Use api.deleteFixedCost
         await fetchCosts();
       } catch (e: any) {
         setError('삭제에 실패했습니다.');

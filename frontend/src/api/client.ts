@@ -5,10 +5,10 @@ export async function api<T = any>(
   init?: RequestInit
 ): Promise<T> {
   const token = localStorage.getItem('authToken');
-  const headers = {
+  const headers: Record<string, string> = { // Fix: Explicitly type headers
     "Content-Type": "application/json",
-    ...init?.headers,
-  } as HeadersInit;
+    ...(init?.headers as Record<string, string> || {}), // Cast init.headers
+  };
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
@@ -20,24 +20,21 @@ export async function api<T = any>(
   });
 
   if (!res.ok) {
-    // Try to parse error response
     const errorBody = await res.json().catch(() => ({}))
     throw new Error(errorBody.message || `${res.status} ${res.statusText}`);
   }
 
-  // For login requests, the token is the whole response
   if (path.includes('/login')) {
     const body = await res.json();
     return body.token as T;
   }
 
-  // For other successful requests that might not return a body (e.g., 204 No Content)
   const contentType = res.headers.get("content-type");
   if (contentType && contentType.indexOf("application/json") !== -1) {
     return res.json();
   }
   
-  return {} as T; // Return empty object for non-json responses
+  return {} as T;
 }
 
 // ─────────────────────────── Auth ───────────────────────────
@@ -173,4 +170,85 @@ export interface StatsData {
 
 export async function getStats(year: number, month: number): Promise<StatsData> {
   return api(`/api/stats?year=${year}&month=${month}`);
+}
+
+// ─────────────────────────── Templates ───────────────────────────
+
+export interface Template {
+  id: string;
+  title: string;
+  group: 'MORNING' | 'EXECUTE' | 'EVENING';
+  weight: number;
+  defaultActive: boolean;
+  order: number;
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
+}
+
+export async function getTemplates(): Promise<Template[]> {
+  return api("/api/templates");
+}
+
+export async function createTemplate(data: { title: string; group: string; }): Promise<Template> {
+  return api("/api/templates", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateTemplate(id: string, data: Partial<Omit<Template, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Template> {
+  return api(`/api/templates/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteTemplate(id: string): Promise<{}> {
+  return api(`/api/templates/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// New functions for DailyTask operations
+export async function addOneoff(data: { title: string; dateYMD: string }): Promise<DailyTask> {
+  return api("/api/daily/oneoff", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateTask(id: string, data: Partial<{ checked: boolean; note: string; value: number }>): Promise<DailyTask> {
+  return api(`/api/tasks/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function upsertTaskFromTemplate(data: { dateYMD: string; templateId: string; checked: boolean; note?: string; value?: number }): Promise<DailyTask> {
+  return api("/api/daily/check", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function createTask(data: { dateYMD: string; templateId: string; checked: boolean; note?: string; value?: number }): Promise<DailyTask> {
+  return upsertTaskFromTemplate(data);
+}
+
+export async function deleteTask(id: string): Promise<{}> {
+  return api(`/api/tasks/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// ─────────────────────────── Daily Summaries ───────────────────────────
+
+export interface DailySummary {
+  dateYMD: string;
+  totalWeight: number;
+  doneWeight: number;
+}
+
+export async function getDailySummaries(from: string, to: string): Promise<DailySummary[]> {
+  return api(`/api/summaries?from=${from}&to=${to}`);
 }

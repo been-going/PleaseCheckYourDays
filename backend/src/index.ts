@@ -2,14 +2,12 @@ import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import morgan from "morgan";
-import { Prisma, User } from "@prisma/client"; // Re-import Prisma and User types
+import { Prisma, User } from "@prisma/client";
 import prisma from "./lib/prisma";
 import passport from "./lib/passport";
 import authRoutes from "./routes/auth";
-import goalRoutes from "./routes/goals";
 import statsRoutes from "./routes/stats";
 
-// Express Request 인터페이스 확장
 declare global {
   namespace Express {
     type PrismaUser = import("@prisma/client").User;
@@ -22,11 +20,10 @@ declare global {
 
 const app = express();
 
-
 app.use(
   cors({
     origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
-    credentials: true, // Allow cookies
+    credentials: true,
     exposedHeaders: ["Authorization"],
   })
 );
@@ -34,7 +31,15 @@ app.use(express.json());
 app.use(morgan("dev"));
 app.use(passport.initialize());
 
-// ─────────────────────────── utils ───────────────────────────
+// Logging middleware to see incoming request headers
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log("Request Headers:", req.headers);
+  next();
+});
+
+// ─────────────────────────── UTILS & HELPERS ───────────────────────────
+
 const safe =
   (fn: (req: Request, res: Response, next: NextFunction) => any) =>
   (req: Request, res: Response, next: NextFunction) =>
@@ -47,6 +52,7 @@ function ymdKST(d = new Date()) {
   const day = String(KST.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+
 function isDone(t: {
   checked: boolean;
   note?: string | null;
@@ -58,6 +64,7 @@ function isDone(t: {
     typeof t.value === "number"
   );
 }
+
 function monthRange(ym: string) {
   const [y, m] = ym.split("-").map(Number);
   const from = new Date(y, m - 1, 1);
@@ -73,23 +80,21 @@ function monthRange(ym: string) {
     ),
   };
 }
+
 async function recalcSummary(userId: string, dateYMD: string) {
   const whereUser = { userId };
   const activeTemplates = await prisma.template.findMany({
     where: { ...whereUser, defaultActive: true },
   });
-
-  const tasks = await prisma.dailyTask.findMany({ where: { ...whereUser, dateYMD } });
-
+  const tasks = await prisma.dailyTask.findMany({
+    where: { ...whereUser, dateYMD },
+  });
   const oneOffTasksTotalWeight = tasks
     .filter((t) => t.isOneOff)
     .reduce((a, t) => a + t.weight, 0);
-
   const totalWeight =
     activeTemplates.reduce((a, t) => a + t.weight, 0) + oneOffTasksTotalWeight;
-
   const doneWeight = tasks.filter(isDone).reduce((a, t) => a + t.weight, 0);
-
   await prisma.daySummary.upsert({
     where: { userId_dateYMD: { userId, dateYMD } },
     update: { totalWeight, doneWeight },
@@ -97,14 +102,50 @@ async function recalcSummary(userId: string, dateYMD: string) {
   });
 }
 
-// ─────────────────────────── routes ───────────────────────────
+async function calculateMonthMatrix(userId: string, ym: string) {
+  if (!/^\d{4}-\d{2}$/.test(ym)) return null;
+  const templates = await prisma.template.findMany({
+    where: { userId },
+    orderBy: [{ group: "asc" }, { order: "asc" }, { createdAt: "asc" }],
+  });
+  const { from, to, days } = monthRange(ym);
+  const tasks = await prisma.dailyTask.findMany({
+    where: {
+      userId,
+      dateYMD: { gte: from, lte: to },
+      templateId: { in: templates.map((t) => t.id) },
+    },
+  });
+  const byDate: Record<string, Record<string, (typeof tasks)[number]>> = {};
+  for (const t of tasks) {
+    if (t.templateId)
+      byDate[t.dateYMD] = { ...byDate[t.dateYMD], [t.templateId]: t };
+  }
+  const rows = days.map((d) => {
+    const cells: Record<string, { done: boolean; note?: string | null }> = {};
+    for (const tpl of templates) {
+      const t = byDate[d]?.[tpl.id];
+      cells[tpl.id] = { done: t ? isDone(t) : false, note: t?.note ?? null };
+    }
+    return { dateYMD: d, cells };
+  });
+  return {
+    columns: templates.map((t) => ({
+      id: t.id,
+      title: t.title,
+      group: t.group,
+    })),
+    rows,
+  };
+}
+
+// ─────────────────────────── ROUTES ───────────────────────────
 
 const auth = passport.authenticate("jwt", { session: false });
 
 // Public routes
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRoutes);
-app.use("/api/goals", auth, goalRoutes);
 app.use("/api/stats", auth, statsRoutes);
 
 // Protected routes
@@ -128,19 +169,22 @@ app.post(
     if (!title) return res.status(400).json({ message: "title is required" });
     if (!["MORNING", "EXECUTE", "EVENING"].includes(group))
       return res.status(400).json({ message: "invalid group" });
-
-    const order = await prisma.template.count({ where: { userId: req.user!.id, group } });
+    const order = await prisma.template.count({
+      where: { userId: req.user!.id, group },
+    });
     try {
       const t = await prisma.template.create({
         data: { title, group, weight, order, userId: req.user!.id },
       });
       return res.status(201).json(t);
     } catch (e: any) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002"
+      )
         return res
           .status(409)
           .json({ message: "template (title, group) already exists" });
-      }
       throw e;
     }
   })
@@ -152,7 +196,6 @@ app.put(
   safe(async (req, res) => {
     const id = String(req.params.id);
     const { title, group, defaultActive, weight, order } = req.body || {};
-
     const data: any = {};
     if (typeof title === "string" && title.trim()) data.title = title.trim();
     if (typeof group === "string") {
@@ -163,7 +206,6 @@ app.put(
     if (typeof defaultActive === "boolean") data.defaultActive = defaultActive;
     if (typeof weight === "number") data.weight = weight;
     if (typeof order === "number") data.order = order;
-
     try {
       const updated = await prisma.template.update({
         where: { id, userId: req.user!.id },
@@ -172,14 +214,12 @@ app.put(
       return res.json(updated);
     } catch (e: any) {
       if (e instanceof Prisma.PrismaClientKnownRequestError) {
-        if (e.code === "P2002") {
+        if (e.code === "P2002")
           return res
             .status(409)
             .json({ message: "template (title, group) already exists" });
-        }
-        if (e.code === "P2025") {
+        if (e.code === "P2025")
           return res.status(404).json({ message: "template not found" });
-        }
       }
       throw e;
     }
@@ -191,11 +231,14 @@ app.delete(
   auth,
   safe(async (req, res) => {
     const id = String(req.params.id);
-    // check ownership before deleting tasks
-    const template = await prisma.template.findFirst({ where: { id, userId: req.user!.id } });
-    if (!template) return res.status(404).json({ message: "template not found" });
-
-    await prisma.dailyTask.deleteMany({ where: { templateId: id, userId: req.user!.id } });
+    const template = await prisma.template.findFirst({
+      where: { id, userId: req.user!.id },
+    });
+    if (!template)
+      return res.status(404).json({ message: "template not found" });
+    await prisma.dailyTask.deleteMany({
+      where: { templateId: id, userId: req.user!.id },
+    });
     await prisma.template.delete({ where: { id, userId: req.user!.id } });
     return res.json({ ok: true });
   })
@@ -219,27 +262,43 @@ app.post(
   "/api/daily/check",
   auth,
   safe(async (req, res) => {
-    const { dateYMD, templateId, checked } = req.body || {};
+    const { dateYMD, templateId, checked, note, value } = req.body || {};
     const date = dateYMD || ymdKST();
-    if (!templateId) return res.status(400).json({ message: "templateId required" });
-
-    const tpl = await prisma.template.findFirst({ where: { id: templateId, userId: req.user!.id } });
+    if (!templateId)
+      return res.status(400).json({ message: "templateId required" });
+    const tpl = await prisma.template.findFirst({
+      where: { id: templateId, userId: req.user!.id },
+    });
     if (!tpl) return res.status(400).json({ message: "invalid templateId" });
 
+    const data: {
+      checked?: boolean;
+      note?: string | null;
+      value?: number | null;
+    } = {};
+    if (checked !== undefined) data.checked = !!checked;
+    if (note !== undefined) data.note = note;
+    if (value !== undefined) data.value = value;
+
     const row = await prisma.dailyTask.upsert({
-      where: { userId_dateYMD_templateId: { userId: req.user!.id, dateYMD: date, templateId } },
+      where: {
+        userId_dateYMD_templateId: {
+          userId: req.user!.id,
+          dateYMD: date,
+          templateId,
+        },
+      },
       create: {
+        ...data,
         dateYMD: date,
         templateId: tpl.id,
         title: tpl.title,
         weight: tpl.weight,
         isOneOff: false,
         userId: req.user!.id,
-        checked: !!checked,
       },
-      update: { checked: !!checked },
+      update: data,
     });
-
     await recalcSummary(req.user!.id, date);
     res.json(row);
   })
@@ -255,17 +314,14 @@ app.post(
       where: { userId_key: { userId: req.user!.id, key: settingKey } },
     });
     const lastYMD = last?.value;
-
     if (lastYMD && lastYMD !== today) {
       await recalcSummary(req.user!.id, lastYMD);
     }
-
     await prisma.setting.upsert({
       where: { userId_key: { userId: req.user!.id, key: settingKey } },
       update: { value: today },
       create: { key: settingKey, value: today, userId: req.user!.id },
     });
-
     await recalcSummary(req.user!.id, today);
     return res.json({ ok: true, dateYMD: today });
   })
@@ -278,11 +334,15 @@ app.post(
     const { title, dateYMD, weight = 1 } = req.body;
     if (!title) return res.status(400).json({ message: "title required" });
     const ymd = dateYMD || ymdKST();
-
     const t = await prisma.dailyTask.create({
-      data: { dateYMD: ymd, title, weight, isOneOff: true, userId: req.user!.id },
+      data: {
+        dateYMD: ymd,
+        title,
+        weight,
+        isOneOff: true,
+        userId: req.user!.id,
+      },
     });
-
     await recalcSummary(req.user!.id, ymd);
     res.status(201).json(t);
   })
@@ -294,9 +354,10 @@ app.patch(
   safe(async (req, res) => {
     const { id } = req.params;
     const { checked, note, value } = req.body || {};
-    const prev = await prisma.dailyTask.findFirst({ where: { id, userId: req.user!.id } });
+    const prev = await prisma.dailyTask.findFirst({
+      where: { id, userId: req.user!.id },
+    });
     if (!prev) return res.status(404).json({ message: "Not found" });
-
     const updated = await prisma.dailyTask.update({
       where: { id },
       data: {
@@ -307,6 +368,19 @@ app.patch(
     });
     await recalcSummary(req.user!.id, updated.dateYMD);
     res.json(updated);
+  })
+);
+
+app.delete(
+  "/api/tasks/:id",
+  auth,
+  safe(async (req, res) => {
+    const task = await prisma.dailyTask.findFirst({
+      where: { id: req.params.id, userId: req.user!.id },
+    });
+    if (!task) return res.status(404).json({ message: "task not found" });
+    await prisma.dailyTask.delete({ where: { id: req.params.id } });
+    res.json({ ok: true });
   })
 );
 
@@ -328,46 +402,10 @@ app.get(
   "/api/month/matrix",
   auth,
   safe(async (req, res) => {
-    const ym = String((req.query.ym || "").toString() || "").slice(0, 7);
-    if (!/^\d{4}-\d{2}$/.test(ym))
-      return res.status(400).json({ message: "ym must be YYYY-MM" });
-
-    const templates = await prisma.template.findMany({
-      where: { userId: req.user!.id, defaultActive: true },
-      orderBy: [{ group: "asc" }, { order: "asc" }, { createdAt: "asc" }],
-    });
-
-    const { from, to, days } = monthRange(ym);
-    const tasks = await prisma.dailyTask.findMany({
-      where: {
-        userId: req.user!.id,
-        dateYMD: { gte: from, lte: to },
-        templateId: { in: templates.map((t) => t.id) },
-      },
-    });
-
-    const byDate: Record<string, Record<string, (typeof tasks)[number]>> = {};
-    for (const t of tasks) {
-      byDate[t.dateYMD] ??= {};
-      if (t.templateId) byDate[t.dateYMD][t.templateId] = t;
-    }
-
-    const rows = days.map((d) => {
-      let doneCount = 0;
-      const cells: Record<string, { done: boolean; note?: string | null }> = {};
-      for (const tpl of templates) {
-        const t = byDate[d]?.[tpl.id];
-        const done = t ? isDone(t) : false;
-        if (done) doneCount++;
-        cells[tpl.id] = { done, note: t?.note ?? null };
-      }
-      return { dateYMD: d, cells, doneCount, totalCount: templates.length };
-    });
-
-    res.json({
-      columns: templates.map((t) => ({ id: t.id, title: t.title, group: t.group })),
-      rows,
-    });
+    const ym = String(req.query.ym || "").slice(0, 7);
+    const matrix = await calculateMonthMatrix(req.user!.id, ym);
+    if (!matrix) return res.status(400).json({ message: "ym must be YYYY-MM" });
+    res.json(matrix);
   })
 );
 
@@ -376,20 +414,24 @@ app.post(
   auth,
   safe(async (req, res) => {
     const { dateYMD, templateId, note, value } = req.body;
-    if (!dateYMD || !templateId) {
+    if (!dateYMD || !templateId)
       return res.status(400).json({ message: "dateYMD, templateId required" });
-    }
-
-    const tpl = await prisma.template.findFirst({ where: { id: templateId, userId: req.user!.id } });
+    const tpl = await prisma.template.findFirst({
+      where: { id: templateId, userId: req.user!.id },
+    });
     if (!tpl) return res.status(404).json({ message: "template not found" });
-
     const data = {
       note: typeof note === "string" ? note : undefined,
       value: typeof value === "number" ? value : undefined,
     };
-
-    await prisma.dailyTask.upsert({
-      where: { userId_dateYMD_templateId: { userId: req.user!.id, dateYMD, templateId } },
+    const row = await prisma.dailyTask.upsert({
+      where: {
+        userId_dateYMD_templateId: {
+          userId: req.user!.id,
+          dateYMD,
+          templateId,
+        },
+      },
       create: {
         ...data,
         dateYMD,
@@ -401,24 +443,8 @@ app.post(
       },
       update: data,
     });
-
-    const row = await prisma.dailyTask.findFirst({
-      where: { dateYMD, templateId, userId: req.user!.id },
-    });
     await recalcSummary(req.user!.id, dateYMD);
     return res.json(row);
-  })
-);
-
-app.delete(
-  "/api/tasks/:id",
-  auth,
-  safe(async (req, res) => {
-    const task = await prisma.dailyTask.findFirst({ where: { id: req.params.id, userId: req.user!.id } });
-    if (!task) return res.status(404).json({ message: "task not found" });
-
-    await prisma.dailyTask.delete({ where: { id: req.params.id } });
-    res.json({ ok: true });
   })
 );
 
@@ -440,9 +466,10 @@ app.post(
   auth,
   safe(async (req, res) => {
     const { name, amount, paymentDate } = req.body || {};
-    if (!name || typeof amount !== "number" || typeof paymentDate !== "number") {
-      return res.status(400).json({ message: "name, amount, paymentDate are required" });
-    }
+    if (!name || typeof amount !== "number" || typeof paymentDate !== "number")
+      return res
+        .status(400)
+        .json({ message: "name, amount, paymentDate are required" });
     const cost = await prisma.fixedCost.create({
       data: { name, amount, paymentDate, userId: req.user!.id },
     });
@@ -459,13 +486,19 @@ app.put(
     try {
       const updatedCost = await prisma.fixedCost.update({
         where: { id, userId: req.user!.id },
-        data: { name: name ?? undefined, amount: amount ?? undefined, paymentDate: paymentDate ?? undefined },
+        data: {
+          name: name ?? undefined,
+          amount: amount ?? undefined,
+          paymentDate: paymentDate ?? undefined,
+        },
       });
       res.json(updatedCost);
     } catch (e: any) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2025"
+      )
         return res.status(404).json({ message: "Fixed cost not found" });
-      }
       throw e;
     }
   })
@@ -480,19 +513,43 @@ app.delete(
       await prisma.fixedCost.delete({ where: { id, userId: req.user!.id } });
       res.json({ ok: true });
     } catch (e: any) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2025"
+      )
         return res.status(404).json({ message: "Fixed cost not found" });
-      }
       throw e;
     }
   })
 );
 
-// ───────────────────────── error handler & listen ─────────────────────────
+// NEW DASHBOARD ENDPOINT
+app.get(
+  "/api/dashboard",
+  auth,
+  safe(async (req, res) => {
+    const year = new Date().getFullYear();
+    const yearQuery = parseInt(String(req.query.year), 10);
+    const targetYear = isNaN(yearQuery) ? year : yearQuery;
+    const templates = await prisma.template.findMany({
+      where: { userId: req.user!.id },
+      orderBy: [{ group: "asc" }, { order: "asc" }, { createdAt: "asc" }],
+    });
+    const matrixPromises = Array.from({ length: 12 }, (_, i) => {
+      const month = String(i + 1).padStart(2, "0");
+      return calculateMonthMatrix(req.user!.id, `${targetYear}-${month}`);
+    });
+    const yearlyMatrixData = await Promise.all(matrixPromises);
+    res.json({ templates, yearlyMatrixData });
+  })
+);
+
+// ───────────────────────── ERROR HANDLER & LISTEN ─────────────────────────
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   console.error("[API ERROR]", err);
-  // Augment error with user info if available
-  const user = req.user ? `${req.user.email} (ID: ${req.user.id})` : "Anonymous";
+  const user = req.user
+    ? `${req.user.email} (ID: ${req.user.id})`
+    : "Anonymous";
   console.error(`Error occurred for user: ${user}`);
   res.status(500).json({ message: "Internal error", detail: err?.message });
 });
@@ -500,5 +557,4 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
 const PORT = Number(process.env.PORT || 4001);
 app.listen(PORT, () => console.log(`API on http://localhost:${PORT}`));
 
-// 404
 app.use((_req, res) => res.status(404).send("Not Found"));

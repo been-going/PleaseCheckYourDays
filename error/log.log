@@ -1,0 +1,112 @@
+$ pnpm dev
+
+> pleaseCheckYourDays@ dev E:\pleaseCheckYourDays
+> pnpm -r --parallel dev
+
+Scope: 2 of 3 workspace projects
+frontend dev$ vite
+backend dev$ tsx watch src/index.ts
+frontend dev:   VITE v7.1.3  ready in 277 ms
+frontend dev:   ➜  Local:   http://localhost:5173/
+frontend dev:   ➜  Network: use --host to expose
+backend dev: [Passport] Loading JWT Secret from env: a-very-super-secret-key-that-should-be-changed-in-production
+backend dev: [Passport] Strategy options set with secret.
+backend dev: API on http://localhost:4001
+backend dev: [2025-09-07T07:35:14.342Z] GET /api/templates
+backend dev: Request Headers: {
+backend dev:   host: 'localhost:4001',
+backend dev:   connection: 'keep-alive',
+backend dev:   'sec-ch-ua-platform': '"Windows"',
+backend dev:   authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtZXFyOTZnczAwMDA4bDFhZGJ2aTAwMWIiLCJlbWFpbCI6ImJlZW4wNTE5QG5hdmVyLmNvbSIsImlhdCI6MTc1NzA2MDM2OSwiZXhwIjoxNzU3NjY1MTY5fQ.htfZt5dSif8APXpwCh3iinTK5iojhLTDnEjXqTFHUVk',
+backend dev:   'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
+backend dev:   'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',  
+backend dev:   'content-type': 'application/json',
+backend dev:   'sec-ch-ua-mobile': '?0',
+backend dev:   accept: '*/*',
+backend dev:   origin: 'http://localhost:5173',
+backend dev:   'sec-fetch-site': 'same-site',
+backend dev:   'sec-fetch-mode': 'cors',
+backend dev:   'sec-fetch-dest': 'empty',
+backend dev:   referer: 'http://localhost:5173/',
+backend dev:   'accept-encoding': 'gzip, deflate, br, zstd',
+backend dev:   'accept-language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+backend dev:   'if-none-match': 'W/"e7-C4DILA4fQFoqgj2r8fvKfmTownQ"'
+backend dev: }
+backend dev: [Passport] JWT Payload Received: {
+backend dev:   id: 'cmeqr96gs00008l1adbvi001b',
+backend dev:   email: 'been0519@naver.com',
+backend dev:   iat: 1757060369,
+backend dev:   exp: 1757665169
+backend dev: }
+backend dev: [2025-09-07T07:35:14.350Z] GET /api/daily/tasks?date=2025-09-07
+backend dev: Request Headers: {
+backend dev:   host: 'localhost:4001',
+backend dev:   connection: 'keep-alive',
+backend dev:   'sec-ch-ua-platform': '"Windows"',
+backend dev:   authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtZXFyOTZnczAwMDA4bDFhZGJ2aTAwMWIiLCJlbWFpbCI6ImJlZW4wNTE5QG5hdmVyLmNvbSIsImlhdCI6MTc1NzA2MDM2OSwiZXhwIjoxNzU3NjY1MTY5fQ.htfZt5dSif8APXpwCh3iinTK5iojhLTDnEjXqTFHUVk',
+backend dev:   'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
+backend dev:   'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',  
+backend dev:   'content-type': 'application/json',
+backend dev:   'sec-ch-ua-mobile': '?0',
+backend dev:   accept: '*/*',
+backend dev:   origin: 'http://localhost:5173',
+backend dev:   'sec-fetch-site': 'same-site',
+backend dev:   'sec-fetch-mode': 'cors',
+backend dev:   'sec-fetch-dest': 'empty',
+backend dev:   referer: 'http://localhost:5173/',
+backend dev:   'accept-encoding': 'gzip, deflate, br, zstd',
+backend dev:   'accept-language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+backend dev:   'if-none-match': 'W/"23-4zpIew9/TaAF0BY6lVix5AK7zxM"'
+backend dev: }
+backend dev: [Passport] JWT Payload Received: {
+backend dev:   id: 'cmeqr96gs00008l1adbvi001b',
+backend dev:   email: 'been0519@naver.com',
+backend dev:   iat: 1757060369,
+backend dev:   exp: 1757665169
+backend dev: }
+backend dev: [Passport] User found in DB: been0519@naver.com
+backend dev: [Passport] User found in DB: been0519@naver.com
+backend dev: GET /api/daily/tasks?date=2025-09-07 304 11.832 ms - -
+backend dev: GET /api/templates 304 20.977 ms - -
+backend dev: [2025-09-07T07:35:16.630Z] POST /api/tasks
+backend dev: Request Headers: {
+backend dev:   host: 'localhost:4001',
+backend dev:   connection: 'keep-alive',
+backend dev:   'content-length': '80',
+backend dev:   'sec-ch-ua-platform': '"Windows"',
+backend dev:   authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtZXFyOTZnczAwMDA4bDFhZGJ2aTAwMWIiLCJlbWFpbCI6ImJlZW4wNTE5QG5hdmVyLmNvbSIsImlhdCI6MTc1NzA2MDM2OSwiZXhwIjoxNzU3NjY1MTY5fQ.htfZt5dSif8APXpwCh3iinTK5iojhLTDnEjXqTFHUVk',
+backend dev:   'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
+backend dev:   'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',  
+backend dev:   'content-type': 'application/json',
+backend dev:   'sec-ch-ua-mobile': '?0',
+backend dev:   accept: '*/*',
+backend dev:   origin: 'http://localhost:5173',
+backend dev:   'sec-fetch-site': 'same-site',
+backend dev:   'sec-fetch-mode': 'cors',
+backend dev:   'sec-fetch-dest': 'empty',
+backend dev:   referer: 'http://localhost:5173/',
+backend dev:   'accept-encoding': 'gzip, deflate, br, zstd',
+backend dev:   'accept-language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+backend dev: }
+backend dev: POST /api/tasks 404 0.939 ms - 9
+backend dev: [2025-09-07T07:35:20.593Z] POST /api/tasks
+backend dev: Request Headers: {
+backend dev:   host: 'localhost:4001',
+backend dev:   connection: 'keep-alive',
+backend dev:   'content-length': '109',
+backend dev:   'sec-ch-ua-platform': '"Windows"',
+backend dev:   authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtZXFyOTZnczAwMDA4bDFhZGJ2aTAwMWIiLCJlbWFpbCI6ImJlZW4wNTE5QG5hdmVyLmNvbSIsImlhdCI6MTc1NzA2MDM2OSwiZXhwIjoxNzU3NjY1MTY5fQ.htfZt5dSif8APXpwCh3iinTK5iojhLTDnEjXqTFHUVk',
+backend dev:   'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
+backend dev:   'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',  
+backend dev:   'content-type': 'application/json',
+backend dev:   'sec-ch-ua-mobile': '?0',
+backend dev:   accept: '*/*',
+backend dev:   origin: 'http://localhost:5173',
+backend dev:   'sec-fetch-site': 'same-site',
+backend dev:   'sec-fetch-mode': 'cors',
+backend dev:   'sec-fetch-dest': 'empty',
+backend dev:   referer: 'http://localhost:5173/',
+backend dev:   'accept-encoding': 'gzip, deflate, br, zstd',
+backend dev:   'accept-language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+backend dev: }
+backend dev: POST /api/tasks 404 0.563 ms - 9

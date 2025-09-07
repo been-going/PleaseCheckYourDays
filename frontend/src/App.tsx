@@ -1,5 +1,6 @@
 import { Routes, Route, Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { useEffect } from 'react';
 
 // Import Pages
 import TodayCombined from './pages/TodayCombined';
@@ -11,16 +12,24 @@ import GoalsPage from './pages/GoalsPage';
 import DashboardPage from './pages/DashboardPage';
 
 // 1. Protected Route Component
-// If not authenticated, redirects to the login page.
+// Renders child routes if the user is authenticated or a guest.
+// Waits for the initial authentication check to complete.
 const ProtectedRoute = () => {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
+  const { isAuthLoading } = useAuth();
+
+  // While checking auth state, render nothing.
+  if (isAuthLoading) {
+    return null;
+  }
+
+  // After auth check, render the main app content (for both users and guests).
+  return <Outlet />;
 };
 
 // 2. Main Layout Component
-// Contains the navigation bar and logout button.
+// Contains the navigation bar and dynamic auth buttons.
 const AppLayout = () => {
-  const { logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const location = useLocation();
 
   return (
@@ -41,9 +50,19 @@ const AppLayout = () => {
         <Link to="/dashboard" className={`btn ${location.pathname === '/dashboard' ? 'active' : ''}`}>
           대시보드
         </Link>
-        <button className="btn" onClick={logout} style={{ marginLeft: 'auto' }}>
-          로그아웃
-        </button>
+        
+        <div style={{ marginLeft: 'auto' }}>
+          {isAuthenticated ? (
+            <button className="btn" onClick={logout}>
+              로그아웃
+            </button>
+          ) : (
+            <>
+              <Link to="/login" className="btn">로그인</Link>
+              <Link to="/signup" className="btn">회원가입</Link>
+            </>
+          )}
+        </div>
       </nav>
       <Outlet /> {/* Child routes will be rendered here */}
     </div>
@@ -54,11 +73,11 @@ const AppLayout = () => {
 export default function App() {
   return (
     <Routes>
-      {/* Public Routes */}
+      {/* Public routes - login and signup are accessible to everyone */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
 
-      {/* Protected Routes */}
+      {/* Main application routes are protected */}
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/" element={<TodayCombined />} />
@@ -69,7 +88,7 @@ export default function App() {
         </Route>
       </Route>
 
-      {/* Fallback for any other path - might be useful to redirect to main page */}
+      {/* Fallback for any other path */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
