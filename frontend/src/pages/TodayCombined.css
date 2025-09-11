@@ -16,3 +16,122 @@
   border-bottom: 1px solid var(--border);
   padding-bottom: 0.5rem;
 }
+
+/* --- 아래 스타일이 추가되었습니다 --- */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  background-color: var(--bg-offset, #3a3a3a);
+  transition: background-color 0.2s ease;
+}
+
+.item:hover {
+  background-color: var(--bg-hover, #4a4a4a);
+}
+
+.item.done .title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.col {
+  flex: 1; /* 사용 가능한 모든 공간을 차지 */
+  min-width: 0; /* 내용이 길어져도 줄어들 수 있도록 설정 (핵심) */
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note {
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.value-input {
+  width: 70px;
+  padding: 0.5rem;
+  text-align: center;
+  border-radius: 6px;
+  border: 1px solid var(--input-border);
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  font-size: 0.9rem;
+}
+
+/* Hide number input spinners for a cleaner look */
+.value-input::-webkit-outer-spin-button,
+.value-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.value-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.menu {
+  position: relative;
+  display: inline-block;
+}
+
+.menu > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 5px);
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  z-index: 10;
+  width: max-content;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.menu-item {
+  background: none;
+  border: none;
+  text-align: left;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background-color: var(--bg-hover);
+}

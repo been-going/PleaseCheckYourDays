@@ -328,7 +328,7 @@ export async function addOneoff(data: {
 
 export async function updateTask(
   id: string,
-  data: Partial<{ checked: boolean; note: string; value: number }>
+  data: Partial<{ checked: boolean; note: string; value: number | null }>
 ): Promise<DailyTask> {
   return api(`/api/tasks/${id}`, {
     method: "PATCH",
@@ -341,7 +341,7 @@ export async function upsertTaskFromTemplate(data: {
   templateId: string;
   checked: boolean;
   note?: string;
-  value?: number;
+  value?: number | null;
 }): Promise<DailyTask> {
   return api("/api/daily/check", {
     method: "POST",
@@ -394,7 +394,7 @@ export async function upsertTaskNote(data: {
   dateYMD: string;
   templateId: string;
   note: string;
-  value?: number;
+  value?: number | null;
 }): Promise<DailyTask> {
   return api("/api/daily/note", {
     method: "POST",

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api";
 import { useAuth } from "../context/AuthContext";
@@ -58,15 +58,23 @@ export default function TodayCombined() {
   const mUpdateTask = useMutation({
     mutationFn: (p: {
       id: string;
-      data: { checked?: boolean; note?: string };
+      data: {
+        checked?: boolean;
+        note?: string;
+        value?: number | null;
+      };
     }) => api.updateTask(p.id, p.data),
     onSuccess: invalidateToday,
     onError: onMutationError,
   });
 
   const mNoteTemplate = useMutation({
-    mutationFn: (p: { dateYMD: string; templateId: string; note: string }) =>
-      api.upsertTaskNote(p),
+    mutationFn: (p: {
+      dateYMD: string;
+      templateId: string;
+      note: string;
+      value: number | null;
+    }) => api.upsertTaskNote(p),
     onSuccess: invalidateToday,
     onError: onMutationError,
   });
@@ -100,6 +108,7 @@ export default function TodayCombined() {
           templateId: id,
           dateYMD,
           note: memoText,
+          value: null, // When creating from memo, value is null
         });
       }
     }
@@ -217,9 +226,19 @@ const OneOffTasksCard = ({
   const api = useApi();
   const { isAuthenticated } = useAuth();
   const [oneoffTitle, setOneoffTitle] = useState("");
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const initialValues: Record<string, string> = {};
+    oneoffs.forEach((t) => {
+      initialValues[t.id] = t.value?.toString() ?? "";
+    });
+    setInputValues(initialValues);
+  }, [oneoffs]);
 
   const invalidateToday = () =>
     qc.invalidateQueries({ queryKey: ["tasks", dateYMD] });
+
   const mAddOneoff = useMutation({
     mutationFn: (p: { title: string; dateYMD: string }) => api.addOneoff(p),
     onSuccess: () => {
@@ -227,11 +246,32 @@ const OneOffTasksCard = ({
       invalidateToday();
     },
   });
+
   const mUpdateTask = useMutation({
-    mutationFn: (p: { id: string; data: { checked: boolean } }) =>
-      api.updateTask(p.id, p.data),
+    mutationFn: (p: {
+      id: string;
+      data: { checked?: boolean; value?: number | null };
+    }) => api.updateTask(p.id, p.data),
     onSuccess: invalidateToday,
   });
+
+  const handleValueChange = (id: string, value: string) => {
+    setInputValues((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleValueBlur = (id: string) => {
+    const task = oneoffs.find((t) => t.id === id);
+    if (!task) return;
+
+    const currentValue = inputValues[id] ?? "";
+    const numericValue =
+      currentValue.trim() === "" ? null : parseFloat(currentValue);
+
+    if (numericValue !== (task.value ?? null)) {
+      mUpdateTask.mutate({ id, data: { value: numericValue } });
+    }
+  };
+
   const mDeleteTask = useMutation({
     mutationFn: (id: string) => api.deleteTask(id),
     onSuccess: invalidateToday,
@@ -284,7 +324,21 @@ const OneOffTasksCard = ({
                 <div className="title">{t.title}</div>
                 {t.note && <div className="note">“{t.note}”</div>}
               </div>
-              <div className="row" style={{ gap: 8 }}>
+              <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                <input
+                  type="number"
+                  className="value-input"
+                  placeholder="수치"
+                  value={inputValues[t.id] ?? ""}
+                  onChange={(e) => handleValueChange(t.id, e.target.value)}
+                  onBlur={() => handleValueBlur(t.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter")
+                      (e.target as HTMLInputElement).blur();
+                  }}
+                  disabled={!isAuthenticated}
+                />
                 <button
                   type="button"
                   className={`btn ${t.checked ? "" : "primary"}`}
@@ -356,7 +410,40 @@ const RoutineTemplatesCard = ({
   const { isAuthenticated } = useAuth();
   const [newTplTitle, setNewTplTitle] = useState("");
   const [newTplGroup, setNewTplGroup] = useState<Group>("EXECUTE");
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
 
+  useEffect(() => {
+    const handleGlobalClick = (event: MouseEvent) => {
+      // Find all open menus within the component
+      const openMenus = document.querySelectorAll<HTMLDetailsElement>(
+        ".routine-group .menu[open]"
+      );
+
+      openMenus.forEach((menu) => {
+        // If the click happened outside of the current open menu, close it.
+        if (!menu.contains(event.target as Node)) {
+          menu.open = false;
+        }
+      });
+    };
+
+    document.addEventListener("click", handleGlobalClick);
+
+    return () => {
+      document.removeEventListener("click", handleGlobalClick);
+    };
+  }, []);
+
+  useEffect(() => {
+    const initialValues: Record<string, string> = {};
+    templates.forEach((tpl) => {
+      const today = byTplId[tpl.id];
+      if (today) {
+        initialValues[tpl.id] = today.value?.toString() ?? "";
+      }
+    });
+    setInputValues(initialValues);
+  }, [templates, byTplId]);
   const invalidateTemplates = () =>
     qc.invalidateQueries({ queryKey: ["templates"] });
   const invalidateToday = () =>
@@ -383,10 +470,47 @@ const RoutineTemplatesCard = ({
     },
   });
   const mUpdateTask = useMutation({
-    mutationFn: (p: { id: string; data: { checked: boolean } }) =>
-      api.updateTask(p.id, p.data),
+    mutationFn: (p: {
+      id: string;
+      data: { checked?: boolean; value?: number | null };
+    }) => api.updateTask(p.id, p.data),
     onSuccess: invalidateToday,
   });
+
+  const mNoteTemplate = useMutation({
+    mutationFn: (p: {
+      dateYMD: string;
+      templateId: string;
+      note: string;
+      value: number | null;
+    }) => api.upsertTaskNote(p),
+    onSuccess: invalidateToday,
+  });
+
+  const handleValueChange = (id: string, value: string) => {
+    setInputValues((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleValueBlur = (tplId: string) => {
+    const today = byTplId[tplId];
+    const currentValue = inputValues[tplId] ?? "";
+    const numericValue =
+      currentValue.trim() === "" ? null : parseFloat(currentValue);
+
+    if (numericValue !== (today?.value ?? null)) {
+      if (today) {
+        mUpdateTask.mutate({ id: today.id, data: { value: numericValue } });
+      } else {
+        mNoteTemplate.mutate({
+          templateId: tplId,
+          dateYMD,
+          note: "",
+          value: numericValue,
+        });
+      }
+    }
+  };
+
   const mCheckTemplate = useMutation({
     mutationFn: (p: {
       dateYMD: string;
@@ -495,7 +619,26 @@ const RoutineTemplatesCard = ({
                           <div className="note">“{today.note}”</div>
                         )}
                       </div>
-                      <div className="row" style={{ gap: 8 }}>
+                      <div
+                        className="row"
+                        style={{ gap: 8, alignItems: "center" }}
+                      >
+                        <input
+                          type="number"
+                          className="value-input"
+                          placeholder="수치"
+                          value={inputValues[tpl.id] ?? ""}
+                          onChange={(e) =>
+                            handleValueChange(tpl.id, e.target.value)
+                          }
+                          onBlur={() => handleValueBlur(tpl.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter")
+                              (e.target as HTMLInputElement).blur();
+                          }}
+                          disabled={!isAuthenticated}
+                        />
                         <button
                           type="button"
                           className={`btn ${success ? "" : "primary"}`}

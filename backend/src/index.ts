@@ -481,13 +481,15 @@ app.patch(
       where: { id, userId: req.user!.id },
     });
     if (!prev) return res.status(404).json({ message: "Not found" });
+
+    const dataToUpdate: Prisma.DailyTaskUpdateInput = {};
+    if (typeof checked === "boolean") dataToUpdate.checked = checked;
+    if (note !== undefined) dataToUpdate.note = note;
+    if (value !== undefined) dataToUpdate.value = value;
+
     const updated = await prisma.dailyTask.update({
       where: { id },
-      data: {
-        checked: typeof checked === "boolean" ? checked : prev.checked,
-        note: note ?? prev.note,
-        value: typeof value === "number" ? value : prev.value,
-      },
+      data: dataToUpdate,
     });
     await recalcSummary(req.user!.id, updated.dateYMD);
     res.json(updated);
@@ -543,10 +545,10 @@ app.post(
       where: { id: templateId, userId: req.user!.id },
     });
     if (!tpl) return res.status(404).json({ message: "template not found" });
-    const data = {
-      note: typeof note === "string" ? note : undefined,
-      value: typeof value === "number" ? value : undefined,
-    };
+    const data: { note?: string; value?: number | null } = {};
+    if (note !== undefined) data.note = note;
+    if (value !== undefined) data.value = value;
+
     const row = await prisma.dailyTask.upsert({
       where: {
         userId_dateYMD_templateId: {
