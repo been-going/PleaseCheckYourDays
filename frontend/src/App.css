@@ -40,3 +40,32 @@
 .read-the-docs {
   color: #888;
 }
+
+/* src/App.css */
+.container {
+  padding: 0 1rem; /* Add horizontal padding */
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+}
+
+.toolbar-actions {
+  margin-left: auto;
+}
+
+/* On smaller screens, make login/logout take full width for better layout */
+@media (max-width: 640px) {
+  .toolbar-actions {
+    margin-left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+  }
+}

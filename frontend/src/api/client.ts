@@ -84,6 +84,15 @@ export async function getDailyTasks(
   return api(`/api/daily/tasks?date=${date}`);
 }
 
+// --- 여기를 추가했습니다! ---
+export async function getTasksForRange(
+  from: string,
+  to: string
+): Promise<DailyTask[]> {
+  return api(`/api/daily/tasks/range?from=${from}&to=${to}`);
+}
+// --------------------------
+
 // ─────────────────────────── Fixed Costs ───────────────────────────
 
 export interface FixedCost {
@@ -157,6 +166,7 @@ export interface RoutineStat {
   successRate: number;
   totalDays: number;
   doneCount: number;
+  isArchived: boolean;
 }
 
 export async function getRoutineStats(
@@ -197,10 +207,15 @@ export interface Template {
   order: number;
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
+  isArchived: boolean;
 }
 
 export async function getTemplates(): Promise<Template[]> {
   return api("/api/templates");
+}
+
+export async function getAllTemplates(): Promise<Template[]> {
+  return api("/api/templates/all");
 }
 
 export async function createTemplate(data: {
@@ -215,7 +230,7 @@ export async function createTemplate(data: {
 
 export async function updateTemplate(
   id: string,
-  data: Partial<Omit<Template, "id" | "createdAt" | "updatedAt">>
+  data: Partial<Omit<Template, "id" | "createdAt" | "updatedAt" | "isArchived">>
 ): Promise<Template> {
   return api(`/api/templates/${id}`, {
     method: "PUT",
@@ -225,6 +240,77 @@ export async function updateTemplate(
 
 export async function deleteTemplate(id: string): Promise<{}> {
   return api(`/api/templates/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getArchivedTemplates(): Promise<Template[]> {
+  return api("/api/templates/archived");
+}
+
+export async function restoreTemplate(id: string): Promise<Template> {
+  return api(`/api/templates/${id}/restore`, {
+    method: "PUT",
+  });
+}
+
+export async function deleteTemplatePermanently(
+  id: string
+): Promise<{ ok: boolean }> {
+  return api(`/api/templates/${id}/permanent`, {
+    method: "DELETE",
+  });
+}
+
+// ─────────────────────────── Goals ───────────────────────────
+
+export interface Goal {
+  id: number;
+  title: string;
+  description: string | null;
+  startDate: string; // ISO date string
+  targetDate: string; // ISO date string
+  progress: number;
+  isAchieved: boolean;
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
+  userId: string;
+}
+
+export async function getGoals(): Promise<Goal[]> {
+  return api("/api/goals");
+}
+
+export async function createGoal(data: {
+  title: string;
+  description?: string;
+  startDate: string;
+  targetDate: string;
+}): Promise<Goal> {
+  return api("/api/goals", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateGoal(
+  id: number,
+  data: Partial<{
+    title: string;
+    description: string;
+    targetDate: string;
+    progress: number;
+    isAchieved: boolean;
+  }>
+): Promise<Goal> {
+  return api(`/api/goals/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteGoal(id: number): Promise<{ ok: boolean }> {
+  return api(`/api/goals/${id}`, {
     method: "DELETE",
   });
 }

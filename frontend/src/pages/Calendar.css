@@ -26,6 +26,15 @@
   font-size: 1.25rem;
 }
 
+.calendar-controls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -89,6 +98,15 @@
   align-self: flex-start;
 }
 
+.day-percentage {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--muted);
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+}
+
 .day-progress {
   width: 100%;
   height: 4px;
@@ -146,6 +164,9 @@
   padding: 0.75rem;
   border-radius: 6px;
   transition: background-color 0.2s ease;
+  gap: 0.5rem;
+  /* Fix for ellipsis in flex children */
+  min-width: 0;
 }
 
 .day-details-list .item:hover {
@@ -158,12 +179,34 @@
   color: var(--muted);
 }
 
+/* --- 여기를 추가했습니다! --- */
+.day-details-list .item.archived {
+  opacity: 0.5;
+}
+
+.day-details-list .item.archived .title span {
+  text-decoration: line-through;
+}
+/* -------------------------- */
+
+.item-content {
+  flex: 1;
+  min-width: 0; /* Allow content to shrink and ellipsis to work */
+  display: flex;
+  flex-direction: column;
+}
+
 .day-details-list .item .title {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   cursor: pointer;
-  flex-grow: 1;
+}
+
+.day-details-list .item .title span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .day-details-list .item .note {
@@ -171,6 +214,9 @@
   color: var(--muted);
   margin-left: 2.25rem; /* Align with text */
   margin-top: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .btn-memo {
@@ -275,4 +321,50 @@
     position: relative; /* Un-stick the sidebar */
     top: auto;
   }
+}
+
+/* Toggle Switch Styles */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 20px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 20px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 12px;
+  width: 12px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--accent);
+}
+
+input:checked + .slider:before {
+  transform: translateX(14px);
 }

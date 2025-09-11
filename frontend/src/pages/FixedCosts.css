@@ -1,0 +1,93 @@
+/* src/pages/FixedCosts.css */
+.fixed-costs-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem 0;
+}
+
+.fixed-costs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.fixed-costs-header h1 {
+  font-size: 1.75rem;
+  margin: 0;
+}
+
+.total-amount {
+  font-size: 1.25rem;
+}
+
+.error-message {
+  color: var(--danger);
+  background-color: var(--danger-bg);
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.add-cost-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.add-cost-form input {
+  flex: 1;
+  /* Using global .btn styles by applying className="btn" */
+}
+
+.costs-table-wrapper {
+  width: 100%;
+  overflow-x: auto; /* For very small screens */
+}
+
+.costs-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 600px; /* Prevent table from getting too squished */
+}
+
+.costs-table th,
+.costs-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.costs-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.costs-table tbody tr:nth-child(even) {
+  background-color: var(--bg-hover);
+}
+
+.costs-table .amount-cell {
+  text-align: right;
+}
+
+.costs-table .actions-cell {
+  text-align: center;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .add-cost-form {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .fixed-costs-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

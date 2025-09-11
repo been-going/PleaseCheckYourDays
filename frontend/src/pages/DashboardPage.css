@@ -109,3 +109,13 @@
   min-width: 50px;
   text-align: center;
 }
+
+/* --- 여기를 추가했습니다! --- */
+.routine-item.archived {
+  opacity: 0.5;
+}
+
+.routine-item.archived strong {
+  text-decoration: line-through;
+}
+/* -------------------------- */

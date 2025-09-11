@@ -79,20 +79,65 @@ function monthRange(ym: string) {
   };
 }
 
+/**
+ * Recalculates and updates the daily summary for a specific user and date.
+ * This function determines the total and completed "weight" of tasks for the day.
+ * @param userId - The ID of the user.
+ * @param dateYMD - The date in 'YYYY-MM-DD' format.
+ */
 async function recalcSummary(userId: string, dateYMD: string) {
   const whereUser = { userId };
-  const activeTemplates = await prisma.template.findMany({
-    where: { ...whereUser, defaultActive: true },
+
+  // 1. Get ALL templates for the user, including archived ones.
+  const allTemplates = await prisma.template.findMany({
+    where: { ...whereUser },
   });
+
+  // 2. Get all tasks for the given day.
   const tasks = await prisma.dailyTask.findMany({
     where: { ...whereUser, dateYMD },
   });
+
+  // 3. Determine which templates were active ON THAT SPECIFIC DAY.
+  const templatesActiveOnDate = allTemplates.filter((tpl) => {
+    // Only consider defaultActive templates for the base total weight.
+    if (!tpl.defaultActive) return false;
+
+    const createdAtDate = tpl.createdAt.toISOString().substring(0, 10);
+    // Template must have been created on or before the summary date.
+    if (dateYMD < createdAtDate) return false;
+
+    // If the template is archived, it was only active if the summary date is BEFORE it was archived.
+    // We use updatedAt as the archival timestamp.
+    if (tpl.isArchived) {
+      const archivedAtDate = tpl.updatedAt.toISOString().substring(0, 10);
+      // If the summary is for a date on or after archival, it wasn't active on that day.
+      if (dateYMD >= archivedAtDate) {
+        return false;
+      }
+    }
+    // If not archived and created before/on the date, it was active.
+    return true;
+  });
+
+  // 4. Calculate total weight from templates that were active on that day.
+  const activeTemplatesTotalWeight = templatesActiveOnDate.reduce(
+    (a, t) => a + t.weight,
+    0
+  );
+
+  // 5. Calculate total weight for one-off tasks for that day.
   const oneOffTasksTotalWeight = tasks
     .filter((t) => t.isOneOff)
     .reduce((a, t) => a + t.weight, 0);
-  const totalWeight =
-    activeTemplates.reduce((a, t) => a + t.weight, 0) + oneOffTasksTotalWeight;
+
+  // 6. The real total weight for the day is the sum of both.
+  const totalWeight = activeTemplatesTotalWeight + oneOffTasksTotalWeight;
+
+  // 7. Done weight is calculated from all tasks of the day, which is correct.
   const doneWeight = tasks.filter(isDone).reduce((a, t) => a + t.weight, 0);
+
+  // 8. Upsert the summary with the correctly calculated weights.
   await prisma.daySummary.upsert({
     where: { userId_dateYMD: { userId, dateYMD } },
     update: { totalWeight, doneWeight },
@@ -100,10 +145,16 @@ async function recalcSummary(userId: string, dateYMD: string) {
   });
 }
 
+/**
+ * Generates a matrix of task completion data for a given month and user.
+ * Used for calendar-like visualizations.
+ * @param userId - The ID of the user.
+ * @param ym - The month in 'YYYY-MM' format.
+ */
 async function calculateMonthMatrix(userId: string, ym: string) {
   if (!/^\d{4}-\d{2}$/.test(ym)) return null;
   const templates = await prisma.template.findMany({
-    where: { userId },
+    where: { userId, isArchived: false },
     orderBy: [{ group: "asc" }, { order: "asc" }, { createdAt: "asc" }],
   });
   const { from, to, days } = monthRange(ym);
@@ -152,7 +203,7 @@ app.get(
   auth,
   safe(async (req, res) => {
     const list = await prisma.template.findMany({
-      where: { userId: req.user!.id },
+      where: { userId: req.user!.id, isArchived: false },
       orderBy: [{ group: "asc" }, { order: "asc" }, { createdAt: "asc" }],
     });
     res.json(list);
@@ -229,16 +280,67 @@ app.delete(
   auth,
   safe(async (req, res) => {
     const id = String(req.params.id);
-    const template = await prisma.template.findFirst({
+    // This is now a "soft delete", moving the template to the archive.
+    await prisma.template.update({
       where: { id, userId: req.user!.id },
+      data: { isArchived: true },
     });
-    if (!template)
-      return res.status(404).json({ message: "template not found" });
-    await prisma.dailyTask.deleteMany({
-      where: { templateId: id, userId: req.user!.id },
-    });
-    await prisma.template.delete({ where: { id, userId: req.user!.id } });
     return res.json({ ok: true });
+  })
+);
+
+app.get(
+  "/api/templates/archived",
+  auth,
+  safe(async (req, res) => {
+    const list = await prisma.template.findMany({
+      where: { userId: req.user!.id, isArchived: true },
+      orderBy: { updatedAt: "desc" },
+    });
+    res.json(list);
+  })
+);
+
+app.get(
+  "/api/templates/all",
+  auth,
+  safe(async (req, res) => {
+    const list = await prisma.template.findMany({
+      where: { userId: req.user!.id },
+      orderBy: [{ group: "asc" }, { order: "asc" }, { createdAt: "asc" }],
+    });
+    res.json(list);
+  })
+);
+
+app.put(
+  "/api/templates/:id/restore",
+  auth,
+  safe(async (req, res) => {
+    const id = String(req.params.id);
+    const restored = await prisma.template.update({
+      where: { id, userId: req.user!.id },
+      data: { isArchived: false },
+    });
+    res.json(restored);
+  })
+);
+
+app.delete(
+  "/api/templates/:id/permanent",
+  auth,
+  safe(async (req, res) => {
+    const id = String(req.params.id);
+    // Permanent deletion requires deleting all associated tasks first.
+    await prisma.$transaction([
+      prisma.dailyTask.deleteMany({
+        where: { templateId: id, userId: req.user!.id },
+      }),
+      prisma.template.delete({
+        where: { id, userId: req.user!.id, isArchived: true },
+      }),
+    ]);
+    res.json({ ok: true });
   })
 );
 
@@ -255,6 +357,29 @@ app.get(
     res.json({ dateYMD, tasks });
   })
 );
+
+// --- 여기를 추가했습니다! ---
+app.get(
+  "/api/daily/tasks/range",
+  auth,
+  safe(async (req, res) => {
+    const { from, to } = req.query as { from?: string; to?: string };
+    if (!from || !to) {
+      return res
+        .status(400)
+        .json({ message: "from and to dates are required" });
+    }
+    const tasks = await prisma.dailyTask.findMany({
+      where: {
+        userId: req.user!.id,
+        dateYMD: { gte: from, lte: to },
+      },
+      orderBy: [{ dateYMD: "asc" }, { createdAt: "asc" }],
+    });
+    res.json(tasks);
+  })
+);
+// --------------------------
 
 app.post(
   "/api/daily/check",
@@ -521,6 +646,99 @@ app.delete(
   })
 );
 
+// Goals
+app.get(
+  "/api/goals",
+  auth,
+  safe(async (req, res) => {
+    const goals = await prisma.goal.findMany({
+      where: { userId: req.user!.id },
+      orderBy: { targetDate: "asc" },
+    });
+    res.json(goals);
+  })
+);
+
+app.post(
+  "/api/goals",
+  auth,
+  safe(async (req, res) => {
+    const { title, description, startDate, targetDate } = req.body || {};
+    if (!title || !targetDate) {
+      return res
+        .status(400)
+        .json({ message: "title and targetDate are required" });
+    }
+    const goal = await prisma.goal.create({
+      data: {
+        title,
+        description,
+        startDate: startDate ? new Date(startDate) : new Date(),
+        targetDate: new Date(targetDate),
+        userId: req.user!.id,
+      },
+    });
+    res.status(201).json(goal);
+  })
+);
+
+app.put(
+  "/api/goals/:id",
+  auth,
+  safe(async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "Invalid goal ID" });
+    }
+    const { title, description, targetDate, progress, isAchieved } =
+      req.body || {};
+    try {
+      const updatedGoal = await prisma.goal.update({
+        where: { id, userId: req.user!.id },
+        data: {
+          title: title ?? undefined,
+          description: description ?? undefined,
+          targetDate: targetDate ? new Date(targetDate) : undefined,
+          progress: progress ?? undefined,
+          isAchieved: isAchieved ?? undefined,
+        },
+      });
+      res.json(updatedGoal);
+    } catch (e: any) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2025"
+      ) {
+        return res.status(404).json({ message: "Goal not found" });
+      }
+      throw e;
+    }
+  })
+);
+
+app.delete(
+  "/api/goals/:id",
+  auth,
+  safe(async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "Invalid goal ID" });
+    }
+    try {
+      await prisma.goal.delete({ where: { id, userId: req.user!.id } });
+      res.json({ ok: true });
+    } catch (e: any) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2025"
+      ) {
+        return res.status(404).json({ message: "Goal not found" });
+      }
+      throw e;
+    }
+  })
+);
+
 // NEW DASHBOARD ENDPOINT
 app.get(
   "/api/dashboard",
@@ -555,6 +773,7 @@ app.get(
         t.id,
         t.title,
         t.createdAt,
+        t.isArchived,
         CAST((
           SELECT COUNT(DISTINCT dt.dateYMD)
           FROM \`DailyTask\` dt
@@ -601,6 +820,7 @@ app.get(
         successRate,
         totalDays,
         doneCount,
+        isArchived: !!r.isArchived,
       };
     });
 

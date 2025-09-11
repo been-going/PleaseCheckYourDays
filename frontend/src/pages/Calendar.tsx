@@ -2,10 +2,12 @@ import React, { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api";
 import type { DailyTask, Template as ITemplate } from "../api/client";
+import { useAuth } from "../context/AuthContext";
 import { getStyleForPercentage } from "../utils/colorUtils";
+import { localYMD, firstOfMonth, lastOfMonth } from "../utils/dateUtils";
+import { MemoModal } from "../components/MemoModal";
 import "./Calendar.css";
 
-// --- Types ---
 type Template = ITemplate;
 type MemoTarget =
   | { kind: "task"; id: string; title: string; note: string | null }
@@ -16,80 +18,147 @@ type MemoTarget =
       note: string | null;
     };
 
-// --- Helper Functions ---
-function localYMD(d: Date = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function firstOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
-}
-
-function lastOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0);
-}
-
-// --- Sub-components ---
+type DisplayTask = DailyTask & { isArchived: boolean };
 
 const DayDetails = ({
   selectedDate,
-  tasks,
-  isLoading,
-  error,
-  onToggleCheck,
   onSetMemoTarget,
+  isAuthenticated,
+  allTemplates, // Prop으로 받음
 }: {
-  selectedDate: string | null;
-  tasks: any[];
-  isLoading: boolean;
-  error: string | null;
-  onToggleCheck: (params: {
-    id?: string;
-    templateId?: string;
-    checked: boolean;
-  }) => void;
+  selectedDate: string;
   onSetMemoTarget: (target: MemoTarget) => void;
+  isAuthenticated: boolean;
+  allTemplates: Template[]; // Prop 타입
 }) => {
-  if (!selectedDate) {
-    return (
-      <div className="sidebar-placeholder">
-        <span>날짜를 선택하여 상세 내용을 확인하세요.</span>
-      </div>
+  const qc = useQueryClient();
+  const api = useApi();
+
+  const {
+    data: dayTasksData,
+    isLoading: isLoadingTasks,
+    error,
+  } = useQuery({
+    queryKey: ["tasks", selectedDate],
+    queryFn: () => api.getDailyTasks(selectedDate),
+    enabled: !!selectedDate && isAuthenticated,
+  });
+
+  const mToggleCheck = useMutation({
+    mutationFn: (p: {
+      id?: string;
+      templateId?: string;
+      checked: boolean;
+      dateYMD: string;
+    }) =>
+      p.id
+        ? api.updateTask(p.id, { checked: p.checked })
+        : api.upsertTaskFromTemplate({ ...p }),
+    onSuccess: (_, variables) => {
+      // 이제 부모 컴포넌트에서 관리하는 월별 task 쿼리를 무효화합니다.
+      const from = localYMD(firstOfMonth(new Date(variables.dateYMD)));
+      const to = localYMD(lastOfMonth(new Date(variables.dateYMD)));
+      qc.invalidateQueries({ queryKey: ["tasks", "range", from, to] });
+      qc.invalidateQueries({ queryKey: ["tasks", variables.dateYMD] });
+    },
+  });
+
+  const displayTasks = useMemo(() => {
+    if (!isAuthenticated) {
+      return [];
+    }
+    if (!dayTasksData || !allTemplates) return [];
+
+    const allTasksForDay = dayTasksData.tasks ?? [];
+    const existingTemplateTaskIds = new Set(
+      allTasksForDay.filter((t) => t.templateId).map((t) => t.templateId!)
     );
-  }
+
+    const placeholderTemplates = allTemplates.filter((tpl) => {
+      if (!tpl.defaultActive) return false;
+      if (existingTemplateTaskIds.has(tpl.id)) return false;
+
+      const createdAtDate = tpl.createdAt.substring(0, 10);
+      if (selectedDate < createdAtDate) return false;
+
+      if (tpl.isArchived) {
+        const archivedAtDate = tpl.updatedAt.substring(0, 10);
+        if (selectedDate >= archivedAtDate) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    const placeholderTasks: DisplayTask[] = placeholderTemplates.map((tpl) => ({
+      id: `placeholder-${tpl.id}`,
+      templateId: tpl.id,
+      title: tpl.title,
+      checked: false,
+      note: null,
+      isOneOff: false,
+      isArchived: tpl.isArchived,
+      dateYMD: selectedDate,
+      value: null,
+      weight: tpl.weight,
+      createdAt: tpl.createdAt,
+      updatedAt: tpl.updatedAt,
+    }));
+
+    const templateMap = new Map(allTemplates.map((t) => [t.id, t]));
+    const augmentedRealTasks: DisplayTask[] = allTasksForDay.map((task) => {
+      const tpl = task.templateId
+        ? templateMap.get(task.templateId)
+        : undefined;
+      return {
+        ...task,
+        isArchived: tpl?.isArchived ?? false,
+      };
+    });
+
+    return [...augmentedRealTasks, ...placeholderTasks];
+  }, [isAuthenticated, dayTasksData, allTemplates, selectedDate]);
 
   return (
     <div className="day-details-container">
       <h3 className="day-details-header">{selectedDate} 루틴</h3>
-      {isLoading && <p>로딩 중...</p>}
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      {!isLoading && !error && (
+      {isLoadingTasks && <p>로딩 중...</p>}
+      {error && (
+        <p style={{ color: "red" }}>태스크를 불러오는 데 실패했습니다.</p>
+      )}
+      {!isLoadingTasks && !error && (
         <div className="day-details-list">
-          {tasks.map((task) => (
+          {displayTasks.map((task) => (
             <div
-              key={task.templateId || task.id}
-              className={`item ${task.checked ? "done" : ""}`}
+              key={task.id}
+              className={`item ${task.checked ? "done" : ""} ${
+                task.isArchived ? "archived" : ""
+              }`}
             >
-              <label className="title">
-                <input
-                  type="checkbox"
-                  checked={task.checked}
-                  onChange={(e) =>
-                    onToggleCheck({
-                      id: task.id,
-                      templateId: task.templateId ?? undefined,
-                      checked: e.target.checked,
-                    })
-                  }
-                />
-                <span>{task.title}</span>
-              </label>
-              {task.note && <div className="note">“{task.note}”</div>}
+              <div className="item-content">
+                <label className="title">
+                  <input
+                    type="checkbox"
+                    checked={task.checked}
+                    disabled={!isAuthenticated || task.isArchived}
+                    onChange={(e) =>
+                      mToggleCheck.mutate({
+                        id: task.id.startsWith("placeholder-")
+                          ? undefined
+                          : task.id,
+                        templateId: task.templateId ?? undefined,
+                        checked: e.target.checked,
+                        dateYMD: selectedDate,
+                      })
+                    }
+                  />
+                  <span>{task.title}</span>
+                </label>
+                {task.note && <div className="note">“{task.note}”</div>}
+              </div>
               <button
                 className="btn-memo"
+                disabled={!isAuthenticated || task.isArchived}
                 aria-label="메모"
                 onClick={() =>
                   onSetMemoTarget(
@@ -119,58 +188,112 @@ const DayDetails = ({
   );
 };
 
-// --- Main Component ---
 export default function Calendar() {
   const qc = useQueryClient();
   const api = useApi();
+  const { isAuthenticated } = useAuth();
   const [focus, setFocus] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showPercentage, setShowPercentage] = useState(false); // 달성률 표시 상태
+  const [memoTarget, setMemoTarget] = useState<MemoTarget | null>(null);
 
-  // --- Data Fetching ---
   const from = localYMD(firstOfMonth(focus));
   const to = localYMD(lastOfMonth(focus));
-  const { data: summaryData } = useQuery({
-    queryKey: ["summaries", from, to],
-    queryFn: () => api.getDailySummaries(from, to),
-  });
-  const summaryMap = useMemo(
-    () => Object.fromEntries((summaryData || []).map((s) => [s.dateYMD, s])),
-    [summaryData]
-  );
-  const { data: templates = [] } = useQuery({
-    queryKey: ["templates"],
-    queryFn: api.getTemplates,
+
+  // 1. 모든 템플릿 정보를 가져옵니다.
+  const { data: allTemplates = [] } = useQuery({
+    queryKey: ["templates", "all"],
+    queryFn: api.getAllTemplates,
+    enabled: isAuthenticated,
   });
 
-  // --- State ---
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [dayTasks, setDayTasks] = useState<DailyTask[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [memoTarget, setMemoTarget] = useState<MemoTarget | null>(null);
-  const [memoText, setMemoText] = useState("");
-  const [isSavingMemo, setIsSavingMemo] = useState(false);
-
-  // --- Mutations ---
-  const mToggleCheck = useMutation({
-    mutationFn: (p: {
-      id?: string;
-      templateId?: string;
-      checked: boolean;
-      dateYMD: string;
-    }) =>
-      p.id
-        ? api.updateTask(p.id, { checked: p.checked })
-        : api.upsertTaskFromTemplate({
-            dateYMD: p.dateYMD,
-            templateId: p.templateId!,
-            checked: p.checked,
-          }),
-    onSuccess: (_, variables) => {
-      qc.invalidateQueries({ queryKey: ["summaries"] });
-      qc.invalidateQueries({ queryKey: ["tasks", variables.dateYMD] });
-      handleDateClick(variables.dateYMD, true);
-    },
+  // 2. 현재 달의 모든 태스크 기록을 가져옵니다.
+  const { data: monthTasks = [] } = useQuery({
+    queryKey: ["tasks", "range", from, to],
+    queryFn: () => api.getTasksForRange(from, to),
+    enabled: isAuthenticated,
   });
+
+  // 3. 프론트엔드에서 직접 달성률 요약 맵을 계산합니다.
+  const summaryMap = useMemo(() => {
+    if (!isAuthenticated || !allTemplates.length) {
+      return {};
+    }
+
+    const summaries: Record<
+      string,
+      { totalWeight: number; doneWeight: number }
+    > = {};
+    const tasksByDate = monthTasks.reduce((acc, task) => {
+      (acc[task.dateYMD] = acc[task.dateYMD] || []).push(task);
+      return acc;
+    }, {} as Record<string, DailyTask[]>);
+
+    const daysInMonth = Array.from(
+      {
+        length: new Date(
+          focus.getFullYear(),
+          focus.getMonth() + 1,
+          0
+        ).getDate(),
+      },
+      (_, i) => localYMD(new Date(focus.getFullYear(), focus.getMonth(), i + 1))
+    );
+
+    for (const dateYMD of daysInMonth) {
+      const tasksOnDate = tasksByDate[dateYMD] || [];
+
+      // 그날 당시에 활성화 상태였던 템플릿을 필터링합니다.
+      const defaultActiveTemplatesOnDate = allTemplates.filter((tpl) => {
+        if (!tpl.defaultActive) return false;
+        const createdAtDate = tpl.createdAt.substring(0, 10);
+        if (dateYMD < createdAtDate) return false;
+        if (tpl.isArchived) {
+          const archivedAtDate = tpl.updatedAt.substring(0, 10);
+          if (dateYMD >= archivedAtDate) return false;
+        }
+        return true;
+      });
+
+      // 그날 실제 기록이 있는 템플릿을 찾습니다.
+      const templateIdsWithTasks = new Set(
+        tasksOnDate.map((t) => t.templateId).filter(Boolean) as string[]
+      );
+      const templatesWithTasksOnDate = allTemplates.filter((tpl) =>
+        templateIdsWithTasks.has(tpl.id)
+      );
+
+      // 두 목록을 합쳐 중복을 제거하여 그날의 총 루틴 목록을 만듭니다.
+      const allRelevantTemplates = new Map<string, Template>();
+      defaultActiveTemplatesOnDate.forEach((tpl) =>
+        allRelevantTemplates.set(tpl.id, tpl)
+      );
+      templatesWithTasksOnDate.forEach((tpl) =>
+        allRelevantTemplates.set(tpl.id, tpl)
+      );
+
+      const relevantTemplatesArray = Array.from(allRelevantTemplates.values());
+
+      const activeTemplatesTotalWeight = relevantTemplatesArray.reduce(
+        (sum, tpl) => sum + tpl.weight,
+        0
+      );
+
+      const oneOffTasksTotalWeight = tasksOnDate
+        .filter((t) => t.isOneOff)
+        .reduce((sum, t) => sum + t.weight, 0);
+
+      const totalWeight = activeTemplatesTotalWeight + oneOffTasksTotalWeight;
+      const doneWeight = tasksOnDate
+        .filter((t) => t.checked)
+        .reduce((sum, t) => sum + t.weight, 0);
+
+      if (totalWeight > 0 || doneWeight > 0) {
+        summaries[dateYMD] = { totalWeight, doneWeight };
+      }
+    }
+    return summaries;
+  }, [isAuthenticated, allTemplates, monthTasks, focus]);
 
   const mUpdateMemo = useMutation({
     mutationFn: (p: {
@@ -187,80 +310,26 @@ export default function Calendar() {
             note: p.note,
           }),
     onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["tasks", "range", from, to] });
       qc.invalidateQueries({ queryKey: ["tasks", variables.dateYMD] });
-      handleDateClick(variables.dateYMD, true);
     },
   });
 
-  // --- Event Handlers ---
-  const handleDateClick = async (date: string, force = false) => {
-    if (date === selectedDate && !force) {
-      setSelectedDate(null);
-      return;
-    }
-    setSelectedDate(date);
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await api.getDailyTasks(date);
-      setDayTasks(result.tasks);
-    } catch (err) {
-      setError("태스크를 불러오는 데 실패했습니다.");
-      setDayTasks([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSaveMemo = async () => {
+  const handleSaveMemo = async (memoText: string) => {
     if (!memoTarget || !selectedDate) return;
-    setIsSavingMemo(true);
-    try {
-      await mUpdateMemo.mutateAsync({
-        dateYMD: selectedDate,
-        taskId: memoTarget.kind === "task" ? memoTarget.id : undefined,
-        templateId:
-          memoTarget.kind === "template" ? memoTarget.templateId : undefined,
-        note: memoText,
-      });
-      setMemoTarget(null);
-    } finally {
-      setIsSavingMemo(false);
-    }
+    const params = {
+      dateYMD: selectedDate,
+      note: memoText,
+      taskId: memoTarget.kind === "task" ? memoTarget.id : undefined,
+      templateId:
+        memoTarget.kind === "template" ? memoTarget.templateId : undefined,
+    };
+    await mUpdateMemo.mutateAsync(params);
+    setMemoTarget(null);
   };
-
-  // --- Data Processing ---
-  const displayTasks = useMemo(() => {
-    const activeTemplates = templates.filter((t) => t.defaultActive);
-    const tasksByTplId = Object.fromEntries(
-      dayTasks.filter((t) => t.templateId).map((t) => [t.templateId, t])
-    );
-    const oneOffs = dayTasks.filter((t) => t.isOneOff);
-    const templateTasks = activeTemplates.map((tpl) => {
-      const task = tasksByTplId[tpl.id];
-      return {
-        id: task?.id,
-        templateId: tpl.id,
-        title: tpl.title,
-        checked: task?.checked ?? false,
-        note: task?.note ?? null,
-        isOneOff: false,
-      };
-    });
-    const oneOffTasks = oneOffs.map((task) => ({
-      id: task.id,
-      templateId: null,
-      title: task.title,
-      checked: task.checked,
-      note: task.note,
-      isOneOff: true,
-    }));
-    return [...templateTasks, ...oneOffTasks];
-  }, [templates, dayTasks]);
 
   const todayYMD = localYMD();
 
-  // --- Render ---
   return (
     <div className="calendar-container">
       <div className="calendar-main card">
@@ -286,6 +355,18 @@ export default function Calendar() {
             {">"}
           </button>
         </div>
+        <div className="calendar-controls">
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={showPercentage}
+              onChange={() => setShowPercentage(!showPercentage)}
+              disabled={!isAuthenticated}
+            />
+            <span className="slider"></span>
+          </label>
+          <span>달성률 숫자 표시</span>
+        </div>
         <div className="calendar-grid">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
             <div key={d} className="calendar-weekday">
@@ -295,7 +376,7 @@ export default function Calendar() {
           {Array(firstOfMonth(focus).getDay())
             .fill(0)
             .map((_, i) => (
-              <div key={"pad" + i} className="calendar-day empty" />
+              <div key={`pad${i}`} className="calendar-day empty" />
             ))}
           {Array.from(
             { length: lastOfMonth(focus).getDate() },
@@ -305,18 +386,18 @@ export default function Calendar() {
             const s = summaryMap[k];
             const ratio = s ? s.doneWeight / Math.max(1, s.totalWeight) : 0;
             const pct = Math.round(ratio * 100);
-            const isSelected = selectedDate === k;
-            const isToday = k === todayYMD;
-
             return (
               <div
                 key={k}
-                onClick={() => handleDateClick(k)}
-                className={`calendar-day ${isSelected ? "selected" : ""} ${
-                  isToday ? "today" : ""
-                }`}
+                onClick={() => setSelectedDate(k)}
+                className={`calendar-day ${
+                  selectedDate === k ? "selected" : ""
+                } ${k === todayYMD ? "today" : ""}`}
               >
                 <div className="day-number">{d.getDate()}</div>
+                {s && showPercentage && (
+                  <div className="day-percentage">{pct}%</div>
+                )}
                 {s && (
                   <div className="day-progress">
                     <div
@@ -333,77 +414,28 @@ export default function Calendar() {
           })}
         </div>
       </div>
-
       <div className="calendar-sidebar card">
-        <DayDetails
-          selectedDate={selectedDate}
-          tasks={displayTasks}
-          isLoading={isLoading}
-          error={error}
-          onToggleCheck={({ id, templateId, checked }) =>
-            mToggleCheck.mutate({
-              id,
-              templateId,
-              checked,
-              dateYMD: selectedDate!,
-            })
-          }
-          onSetMemoTarget={(target) => {
-            setMemoTarget(target);
-            setMemoText(target.note || "");
-          }}
-        />
-      </div>
-
-      {/* Memo Modal */}
-      {memoTarget && (
-        <div className="modal-overlay" onClick={() => setMemoTarget(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <span>{memoTarget.title} 메모</span>
-              <button
-                className="btn-close"
-                onClick={() => setMemoTarget(null)}
-                aria-label="닫기"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="modal-body">
-              <textarea
-                autoFocus
-                value={memoText}
-                onChange={(e) => setMemoText(e.target.value)}
-                placeholder="오늘 느낀 점, 기록하고 싶은 내용을 적어주세요…"
-                onKeyDown={(e) => {
-                  if ((e.ctrlKey || e.metaKey) && e.key === "Enter")
-                    handleSaveMemo();
-                  if (e.key === "Escape") setMemoTarget(null);
-                }}
-              />
-            </div>
-            <div className="modal-footer">
-              <div className="hotkey-hint">Ctrl/⌘ + Enter 저장 • Esc 닫기</div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  className="btn"
-                  onClick={() => setMemoTarget(null)}
-                  disabled={isSavingMemo}
-                >
-                  취소
-                </button>
-                <button
-                  className="btn primary"
-                  onClick={handleSaveMemo}
-                  disabled={isSavingMemo}
-                >
-                  {isSavingMemo ? "저장 중..." : "저장"}
-                </button>
-              </div>
-            </div>
+        {selectedDate ? (
+          <DayDetails
+            selectedDate={selectedDate}
+            onSetMemoTarget={setMemoTarget}
+            isAuthenticated={isAuthenticated}
+            allTemplates={allTemplates}
+          />
+        ) : (
+          <div className="sidebar-placeholder">
+            <span>날짜를 선택하여 상세 내용을 확인하세요.</span>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+      <MemoModal
+        isOpen={!!memoTarget}
+        targetTitle={memoTarget?.title ?? ""}
+        initialText={memoTarget?.note ?? ""}
+        isSaving={mUpdateMemo.isPending}
+        onClose={() => setMemoTarget(null)}
+        onSave={handleSaveMemo}
+      />
     </div>
   );
 }

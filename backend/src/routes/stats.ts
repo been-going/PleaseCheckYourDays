@@ -1,17 +1,16 @@
-import express from 'express';
-import { User } from '@prisma/client'; // Re-import User type
-import prisma from '../lib/prisma';
-
+import express from "express";
+import { User } from "@prisma/client"; // Re-import User type
+import prisma from "../lib/prisma";
 
 const router = express.Router();
 
 // GET /api/stats?year=YYYY&month=MM
-router.get('/', async (req, res) => {
+router.get("/", async (req, res) => {
   const userId = req.user!.id;
   const { year, month } = req.query;
 
   if (!year || !month) {
-    return res.status(400).json({ message: 'Year and month are required' });
+    return res.status(400).json({ message: "Year and month are required" });
   }
 
   const yearNum = parseInt(year as string, 10);
@@ -21,8 +20,8 @@ router.get('/', async (req, res) => {
   const endDate = new Date(Date.UTC(yearNum, monthNum, 0, 23, 59, 59, 999));
 
   // Convert to YYYY-MM-DD string format for Prisma query on string date fields
-  const startDateString = startDate.toISOString().split('T')[0];
-  const endDateString = endDate.toISOString().split('T')[0];
+  const startDateString = startDate.toISOString().split("T")[0];
+  const endDateString = endDate.toISOString().split("T")[0];
 
   try {
     // 1. Task completion stats
@@ -37,11 +36,11 @@ router.get('/', async (req, res) => {
     });
 
     const totalTasks = tasks.length;
-    const completedTasks = tasks.filter(t => t.checked).length;
+    const completedTasks = tasks.filter((t) => t.checked).length;
 
     // 2. Tasks by template (category)
     const tasksByTemplate = await prisma.dailyTask.groupBy({
-      by: ['templateId'],
+      by: ["templateId"],
       where: {
         userId,
         templateId: { not: null },
@@ -56,27 +55,31 @@ router.get('/', async (req, res) => {
     });
 
     // Fetch template titles for better labels
-    const templateIds = tasksByTemplate.map(t => t.templateId!);
+    const templateIds = tasksByTemplate.map((t) => t.templateId!);
     const templates = await prisma.template.findMany({
       where: { id: { in: templateIds } },
       select: { id: true, title: true },
     });
-    const templateMap = new Map(templates.map(t => [t.id, t.title]));
+    const templateMap = new Map(templates.map((t) => [t.id, t.title]));
 
-    const categoryStats = tasksByTemplate.map(t => ({
-      name: templateMap.get(t.templateId!) || 'Unknown',
+    const categoryStats = tasksByTemplate.map((t) => ({
+      name: templateMap.get(t.templateId!) || "Unknown",
       count: t._count.id,
     }));
 
     // 3. Fixed costs for the month
     const fixedCosts = await prisma.fixedCost.findMany({ where: { userId } });
-    const totalFixedCost = fixedCosts.reduce((sum, cost) => sum + cost.amount, 0);
+    const totalFixedCost = fixedCosts.reduce(
+      (sum, cost) => sum + cost.amount,
+      0
+    );
 
     res.json({
       taskStats: {
         total: totalTasks,
         completed: completedTasks,
-        completionRate: totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0,
+        completionRate:
+          totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0,
       },
       categoryStats,
       fixedCostStats: {
@@ -84,10 +87,9 @@ router.get('/', async (req, res) => {
         count: fixedCosts.length,
       },
     });
-
   } catch (error) {
-    console.error('Error fetching stats:', error);
-    res.status(500).json({ message: 'Error fetching stats' });
+    console.error("Error fetching stats:", error);
+    res.status(500).json({ message: "Error fetching stats" });
   }
 });
 

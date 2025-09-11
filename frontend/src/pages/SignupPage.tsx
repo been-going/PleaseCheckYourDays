@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useApi } from "../api";
 import { Link, useNavigate } from "react-router-dom";
+import "./Auth.css";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -25,25 +26,18 @@ export default function SignupPage() {
   };
 
   return (
-    <div
-      style={{
-        maxWidth: "400px",
-        margin: "50px auto",
-        padding: "20px",
-        border: "1px solid #ccc",
-        borderRadius: "8px",
-      }}
-    >
+    <div className="auth-container">
       <h2>회원가입</h2>
       {success ? (
         <div>
-          <p style={{ color: "green" }}>회원가입에 성공했습니다!</p>
+          <p className="auth-success">회원가입에 성공했습니다!</p>
           <p>잠시 후 로그인 페이지로 이동합니다...</p>
           <Link to="/login">지금 로그인하기</Link>
         </div>
       ) : (
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: "15px" }}>
+        <form onSubmit={handleSubmit} className="auth-form">
+          {error && <p className="auth-error">{error}</p>}
+          <div className="form-group">
             <label htmlFor="email">이메일</label>
             <input
               type="email"
@@ -51,10 +45,9 @@ export default function SignupPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={{ width: "100%", padding: "8px", marginTop: "5px" }}
             />
           </div>
-          <div style={{ marginBottom: "15px" }}>
+          <div className="form-group">
             <label htmlFor="password">비밀번호</label>
             <input
               type="password"
@@ -62,26 +55,14 @@ export default function SignupPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              style={{ width: "100%", padding: "8px", marginTop: "5px" }}
             />
           </div>
-          {error && <p style={{ color: "red" }}>{error}</p>}
-          <button
-            type="submit"
-            style={{
-              width: "100%",
-              padding: "10px",
-              backgroundColor: "#007bff",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-            }}
-          >
+          <button type="submit" className="btn primary btn-submit">
             회원가입
           </button>
         </form>
       )}
-      <p style={{ marginTop: "20px", textAlign: "center" }}>
+      <p className="auth-link">
         이미 계정이 있으신가요? <Link to="/login">로그인</Link>
       </p>
     </div>

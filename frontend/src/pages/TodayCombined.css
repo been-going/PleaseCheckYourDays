@@ -1,0 +1,18 @@
+.routine-group {
+  margin-bottom: 1.5rem;
+}
+
+.routine-group:last-child {
+  margin-bottom: 0;
+}
+
+.routine-group-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.75rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
