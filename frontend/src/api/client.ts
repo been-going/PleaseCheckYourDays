@@ -205,6 +205,8 @@ export interface Template {
   weight: number;
   defaultActive: boolean;
   order: number;
+  enableValue: boolean;
+  enableNote: boolean;
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
   isArchived: boolean;

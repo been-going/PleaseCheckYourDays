@@ -71,15 +71,31 @@
   text-overflow: ellipsis;
 }
 
+.value-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
 .value-input {
   width: 70px;
   padding: 0.5rem;
-  text-align: center;
+  text-align: left;
+  padding-right: 2.2em; /* Make space for the unit */
   border-radius: 6px;
   border: 1px solid var(--input-border);
   background-color: var(--input-bg);
   color: var(--input-text);
   font-size: 0.9rem;
+}
+
+.value-input-unit {
+  position: absolute;
+  right: 0.6rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: bold;
+  pointer-events: none; /* So it doesn't interfere with input clicks */
 }
 
 /* Hide number input spinners for a cleaner look */
@@ -91,6 +107,11 @@
 
 .value-input[type="number"] {
   -moz-appearance: textfield;
+}
+
+.btn-toggle-success {
+  min-width: 95px;
+  justify-content: center;
 }
 
 .menu {
@@ -134,4 +155,25 @@
 
 .menu-item:hover {
   background-color: var(--bg-hover);
+}
+
+.login-prompt-container {
+  padding: 2rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.login-prompt-container h3 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.login-prompt-container p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 400px;
+  line-height: 1.6;
 }

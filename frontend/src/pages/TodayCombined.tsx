@@ -7,6 +7,7 @@ import { getStyleForPercentage } from "../utils/colorUtils";
 import { localYMD } from "../utils/dateUtils";
 import { MemoModal } from "../components/MemoModal";
 import { TrashModal } from "../components/TrashModal";
+import { Link } from "react-router-dom";
 import "./TodayCombined.css";
 
 type Group = "MORNING" | "EXECUTE" | "EVENING";
@@ -27,10 +28,26 @@ function sortKey(t: { group: Group; order?: number }) {
   return order[t.group] * 1000 + ((t as any).order ?? 0);
 }
 
-export default function TodayCombined() {
+function TodayCombinedContent({
+  isAuthenticated,
+}: {
+  isAuthenticated: boolean;
+}) {
+  // 로그인하지 않은 사용자는 로그인 안내 화면을 표시합니다.
+  if (!isAuthenticated) {
+    return (
+      <div className="card login-prompt-container">
+        <h3>로그인이 필요합니다</h3>
+        <p>로그인하여 오늘의 할 일과 루틴을 관리하고 진행 상황을 추적하세요.</p>
+        <Link to="/login" className="btn primary" style={{ marginTop: "1rem" }}>
+          로그인 페이지로 이동
+        </Link>
+      </div>
+    );
+  }
+
   const qc = useQueryClient();
   const api = useApi();
-  const { isAuthenticated } = useAuth();
 
   const [memoTarget, setMemoTarget] = useState<MemoTarget | null>(null);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
@@ -115,7 +132,8 @@ export default function TodayCombined() {
     setMemoTarget(null);
   };
 
-  const isLoading = (qTpl.isLoading || qDay.isLoading) && isAuthenticated;
+  // 데이터 로딩은 로그인 되었을 때만 의미가 있습니다.
+  const isLoading = isAuthenticated && (qTpl.isLoading || qDay.isLoading);
 
   if (isLoading) {
     return <div className="card">Loading...</div>;
@@ -153,6 +171,20 @@ export default function TodayCombined() {
       <TrashModal isOpen={isTrashOpen} onClose={() => setIsTrashOpen(false)} />
     </div>
   );
+}
+
+/**
+ * 인증 상태 로딩을 처리하는 Wrapper 컴포넌트입니다.
+ * isAuthLoading이 true이면 로딩 화면을, false이면 실제 컨텐츠를 렌더링합니다.
+ */
+export default function TodayCombined() {
+  const { isAuthenticated, isAuthLoading } = useAuth();
+
+  if (isAuthLoading) {
+    return <div className="card">Loading...</div>;
+  }
+
+  return <TodayCombinedContent isAuthenticated={isAuthenticated} />;
 }
 
 // --- Sub Components ---
@@ -325,23 +357,27 @@ const OneOffTasksCard = ({
                 {t.note && <div className="note">“{t.note}”</div>}
               </div>
               <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                <input
-                  type="number"
-                  className="value-input"
-                  placeholder="수치"
-                  value={inputValues[t.id] ?? ""}
-                  onChange={(e) => handleValueChange(t.id, e.target.value)}
-                  onBlur={() => handleValueBlur(t.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter")
-                      (e.target as HTMLInputElement).blur();
-                  }}
-                  disabled={!isAuthenticated}
-                />
+                <div className="value-input-wrapper">
+                  <input
+                    type="number"
+                    className="value-input"
+                    value={inputValues[t.id] ?? ""}
+                    onChange={(e) => handleValueChange(t.id, e.target.value)}
+                    onBlur={() => handleValueBlur(t.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter")
+                        (e.target as HTMLInputElement).blur();
+                    }}
+                    disabled={!isAuthenticated}
+                  />
+                  <span className="value-input-unit">시간</span>
+                </div>
                 <button
                   type="button"
-                  className={`btn ${t.checked ? "" : "primary"}`}
+                  className={`btn btn-toggle-success ${
+                    t.checked ? "" : "primary"
+                  }`}
                   disabled={!isAuthenticated}
                   onClick={() =>
                     mUpdateTask.mutate({
@@ -468,6 +504,13 @@ const RoutineTemplatesCard = ({
       qc.invalidateQueries({ queryKey: ["routineStats"] });
       alert("루틴이 휴지통으로 이동했습니다.");
     },
+  });
+  const mUpdateTplFlags = useMutation({
+    mutationFn: (p: {
+      id: string;
+      data: { enableValue?: boolean; enableNote?: boolean };
+    }) => api.updateTemplate(p.id, p.data),
+    onSuccess: invalidateTemplates,
   });
   const mUpdateTask = useMutation({
     mutationFn: (p: {
@@ -615,7 +658,7 @@ const RoutineTemplatesCard = ({
                     >
                       <div className="col">
                         <div className="title">{tpl.title}</div>
-                        {today?.note && (
+                        {tpl.enableNote && today?.note && (
                           <div className="note">“{today.note}”</div>
                         )}
                       </div>
@@ -623,25 +666,31 @@ const RoutineTemplatesCard = ({
                         className="row"
                         style={{ gap: 8, alignItems: "center" }}
                       >
-                        <input
-                          type="number"
-                          className="value-input"
-                          placeholder="수치"
-                          value={inputValues[tpl.id] ?? ""}
-                          onChange={(e) =>
-                            handleValueChange(tpl.id, e.target.value)
-                          }
-                          onBlur={() => handleValueBlur(tpl.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter")
-                              (e.target as HTMLInputElement).blur();
-                          }}
-                          disabled={!isAuthenticated}
-                        />
+                        {tpl.enableValue && (
+                          <div className="value-input-wrapper">
+                            <input
+                              type="number"
+                              className="value-input"
+                              value={inputValues[tpl.id] ?? ""}
+                              onChange={(e) =>
+                                handleValueChange(tpl.id, e.target.value)
+                              }
+                              onBlur={() => handleValueBlur(tpl.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter")
+                                  (e.target as HTMLInputElement).blur();
+                              }}
+                              disabled={!isAuthenticated}
+                            />
+                            <span className="value-input-unit">시간</span>
+                          </div>
+                        )}
                         <button
                           type="button"
-                          className={`btn ${success ? "" : "primary"}`}
+                          className={`btn btn-toggle-success ${
+                            success ? "" : "primary"
+                          }`}
                           disabled={!isAuthenticated}
                           onClick={() => {
                             if (today)
@@ -659,21 +708,23 @@ const RoutineTemplatesCard = ({
                         >
                           {success ? "취소" : "오늘 성공"}
                         </button>
-                        <button
-                          type="button"
-                          className="btn"
-                          disabled={!isAuthenticated}
-                          onClick={() =>
-                            onSetMemoTarget({
-                              kind: "template",
-                              id: tpl.id,
-                              title: tpl.title,
-                              note: today?.note ?? null,
-                            })
-                          }
-                        >
-                          메모
-                        </button>
+                        {tpl.enableNote && (
+                          <button
+                            type="button"
+                            className="btn"
+                            disabled={!isAuthenticated}
+                            onClick={() =>
+                              onSetMemoTarget({
+                                kind: "template",
+                                id: tpl.id,
+                                title: tpl.title,
+                                note: today?.note ?? null,
+                              })
+                            }
+                          >
+                            메모
+                          </button>
+                        )}
                         <details
                           className="menu"
                           {...(!isAuthenticated && {
@@ -702,6 +753,34 @@ const RoutineTemplatesCard = ({
                               type="button"
                               className="menu-item"
                               onClick={() => {
+                                mUpdateTplFlags.mutate({
+                                  id: tpl.id,
+                                  data: { enableNote: !tpl.enableNote },
+                                });
+                              }}
+                            >
+                              {tpl.enableNote
+                                ? "메모 작성 끄기"
+                                : "메모 작성 켜기"}
+                            </button>
+                            <button
+                              type="button"
+                              className="menu-item"
+                              onClick={() => {
+                                mUpdateTplFlags.mutate({
+                                  id: tpl.id,
+                                  data: { enableValue: !tpl.enableValue },
+                                });
+                              }}
+                            >
+                              {tpl.enableValue
+                                ? "시간 작성 끄기"
+                                : "시간 작성 켜기"}
+                            </button>
+                            <button
+                              type="button"
+                              className="menu-item"
+                              onClick={() => {
                                 if (
                                   confirm(
                                     `'${tpl.title}' 루틴을 휴지통으로 이동하시겠습니까? (기록은 유지됩니다)`
@@ -723,11 +802,6 @@ const RoutineTemplatesCard = ({
             </div>
           );
         })}
-        {!isAuthenticated && templates.length === 0 && (
-          <p style={{ textAlign: "center", color: "var(--muted)" }}>
-            로그인하여 고정 루틴을 만들고 매일의 습관을 관리하세요.
-          </p>
-        )}
       </div>
     </div>
   );

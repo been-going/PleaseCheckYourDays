@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { getStyleForPercentage } from "../utils/colorUtils";
 import { localYMD, firstOfMonth, lastOfMonth } from "../utils/dateUtils";
 import { MemoModal } from "../components/MemoModal";
+import { Link } from "react-router-dom";
 import "./Calendar.css";
 
 type Template = ITemplate;
@@ -18,7 +19,7 @@ type MemoTarget =
       note: string | null;
     };
 
-type DisplayTask = DailyTask & { isArchived: boolean };
+type DisplayTask = DailyTask & { isArchived: boolean; enableNote: boolean };
 
 const DayDetails = ({
   selectedDate,
@@ -103,6 +104,7 @@ const DayDetails = ({
       weight: tpl.weight,
       createdAt: tpl.createdAt,
       updatedAt: tpl.updatedAt,
+      enableNote: tpl.enableNote,
     }));
 
     const templateMap = new Map(allTemplates.map((t) => [t.id, t]));
@@ -113,85 +115,100 @@ const DayDetails = ({
       return {
         ...task,
         isArchived: tpl?.isArchived ?? false,
+        enableNote: tpl?.enableNote ?? true,
       };
     });
 
-    return [...augmentedRealTasks, ...placeholderTasks];
+    return [...augmentedRealTasks, ...placeholderTasks].sort(
+      (a, b) => (a.isOneOff ? 1 : 0) - (b.isOneOff ? 1 : 0)
+    );
   }, [isAuthenticated, dayTasksData, allTemplates, selectedDate]);
 
   return (
     <div className="day-details-container">
       <h3 className="day-details-header">{selectedDate} 루틴</h3>
-      {isLoadingTasks && <p>로딩 중...</p>}
-      {error && (
-        <p style={{ color: "red" }}>태스크를 불러오는 데 실패했습니다.</p>
-      )}
-      {!isLoadingTasks && !error && (
+      {!isAuthenticated ? (
+        <div className="login-prompt">
+          <p>로그인하여 {selectedDate}의 루틴을 관리해보세요.</p>
+          <Link to="/login" className="btn primary">
+            로그인
+          </Link>
+        </div>
+      ) : isLoadingTasks ? (
+        <p style={{ textAlign: "center", color: "var(--muted)" }}>로딩 중...</p>
+      ) : error ? (
+        <p className="error-message">태스크를 불러오는 데 실패했습니다.</p>
+      ) : (
         <div className="day-details-list">
-          {displayTasks.map((task) => (
-            <div
-              key={task.id}
-              className={`item ${task.checked ? "done" : ""} ${
-                task.isArchived ? "archived" : ""
-              }`}
-            >
-              <div className="item-content">
-                <label className="title">
-                  <input
-                    type="checkbox"
-                    checked={task.checked}
+          {displayTasks.length > 0 ? (
+            displayTasks.map((task) => (
+              <div
+                key={task.id}
+                className={`item ${task.checked ? "done" : ""} ${
+                  task.isArchived ? "archived" : ""
+                }`}
+              >
+                <div className="item-content">
+                  <label className="title">
+                    <input
+                      type="checkbox"
+                      checked={task.checked}
+                      disabled={!isAuthenticated || task.isArchived}
+                      onChange={(e) =>
+                        mToggleCheck.mutate({
+                          id: task.id.startsWith("placeholder-")
+                            ? undefined
+                            : task.id,
+                          templateId: task.templateId ?? undefined,
+                          checked: e.target.checked,
+                          dateYMD: selectedDate,
+                        })
+                      }
+                    />
+                    <span>{task.title}</span>
+                  </label>
+                  {(task.note || task.value !== null) && (
+                    <div className="note">
+                      {task.value !== null && (
+                        <span className="task-value">[{task.value}시간] </span>
+                      )}
+                      {task.enableNote && task.note && `“${task.note}”`}
+                    </div>
+                  )}
+                </div>
+                {task.enableNote && !task.isOneOff && (
+                  <button
+                    className="btn-memo"
                     disabled={!isAuthenticated || task.isArchived}
-                    onChange={(e) =>
-                      mToggleCheck.mutate({
-                        id: task.id.startsWith("placeholder-")
-                          ? undefined
-                          : task.id,
-                        templateId: task.templateId ?? undefined,
-                        checked: e.target.checked,
-                        dateYMD: selectedDate,
+                    aria-label="메모"
+                    onClick={() =>
+                      onSetMemoTarget({
+                        kind: "template",
+                        templateId: task.templateId!,
+                        title: task.title,
+                        note: task.note,
                       })
                     }
-                  />
-                  <span>{task.title}</span>
-                </label>
-                {task.note && <div className="note">“{task.note}”</div>}
+                  >
+                    📝
+                  </button>
+                )}
               </div>
-              <button
-                className="btn-memo"
-                disabled={!isAuthenticated || task.isArchived}
-                aria-label="메모"
-                onClick={() =>
-                  onSetMemoTarget(
-                    task.isOneOff
-                      ? {
-                          kind: "task",
-                          id: task.id!,
-                          title: task.title,
-                          note: task.note,
-                        }
-                      : {
-                          kind: "template",
-                          templateId: task.templateId!,
-                          title: task.title,
-                          note: task.note,
-                        }
-                  )
-                }
-              >
-                📝
-              </button>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p style={{ textAlign: "center", color: "var(--muted)" }}>
+              이 날짜에 해당하는 루틴이 없습니다.
+            </p>
+          )}
         </div>
       )}
     </div>
   );
 };
 
-export default function Calendar() {
+function CalendarContent({ isAuthenticated }: { isAuthenticated: boolean }) {
   const qc = useQueryClient();
   const api = useApi();
-  const { isAuthenticated } = useAuth();
   const [focus, setFocus] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showPercentage, setShowPercentage] = useState(false); // 달성률 표시 상태
@@ -201,14 +218,14 @@ export default function Calendar() {
   const to = localYMD(lastOfMonth(focus));
 
   // 1. 모든 템플릿 정보를 가져옵니다.
-  const { data: allTemplates = [] } = useQuery({
+  const { data: allTemplates = [], isLoading: isLoadingTemplates } = useQuery({
     queryKey: ["templates", "all"],
     queryFn: api.getAllTemplates,
     enabled: isAuthenticated,
   });
 
   // 2. 현재 달의 모든 태스크 기록을 가져옵니다.
-  const { data: monthTasks = [] } = useQuery({
+  const { data: monthTasks = [], isLoading: isLoadingMonthTasks } = useQuery({
     queryKey: ["tasks", "range", from, to],
     queryFn: () => api.getTasksForRange(from, to),
     enabled: isAuthenticated,
@@ -330,6 +347,17 @@ export default function Calendar() {
 
   const todayYMD = localYMD();
 
+  const isLoading =
+    isAuthenticated && (isLoadingTemplates || isLoadingMonthTasks);
+
+  if (isLoading) {
+    return (
+      <div className="card">
+        <p style={{ textAlign: "center" }}>Loading Calendar Data...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="calendar-container">
       <div className="calendar-main card">
@@ -438,4 +466,22 @@ export default function Calendar() {
       />
     </div>
   );
+}
+
+/**
+ * 인증 상태 로딩을 처리하는 Wrapper 컴포넌트입니다.
+ * isAuthLoading이 true이면 로딩 화면을, false이면 실제 컨텐츠를 렌더링합니다.
+ */
+export default function Calendar() {
+  const { isAuthenticated, isAuthLoading } = useAuth();
+
+  if (isAuthLoading) {
+    return (
+      <div className="card">
+        <p style={{ textAlign: "center" }}>Loading Calendar...</p>
+      </div>
+    );
+  }
+
+  return <CalendarContent isAuthenticated={isAuthenticated} />;
 }

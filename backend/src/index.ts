@@ -244,7 +244,15 @@ app.put(
   auth,
   safe(async (req, res) => {
     const id = String(req.params.id);
-    const { title, group, defaultActive, weight, order } = req.body || {};
+    const {
+      title,
+      group,
+      defaultActive,
+      weight,
+      order,
+      enableValue,
+      enableNote,
+    } = req.body || {};
     const data: any = {};
     if (typeof title === "string" && title.trim()) data.title = title.trim();
     if (typeof group === "string") {
@@ -255,6 +263,8 @@ app.put(
     if (typeof defaultActive === "boolean") data.defaultActive = defaultActive;
     if (typeof weight === "number") data.weight = weight;
     if (typeof order === "number") data.order = order;
+    if (typeof enableValue === "boolean") data.enableValue = enableValue;
+    if (typeof enableNote === "boolean") data.enableNote = enableNote;
     try {
       const updated = await prisma.template.update({
         where: { id, userId: req.user!.id },
@@ -872,19 +882,34 @@ app.get(
       ORDER BY dateYMD ASC
     `;
 
-    const completionData = tasks
-      .filter(isDone) // Now correctly filters by checked status only
-      .map((task) => {
-        let level = 1; // Base level for just being checked
-        if (task.note && task.note.trim().length > 0) level = 2;
-        if (typeof task.value === "number") level = 3; // Highest level for having a value
-        return {
-          date: task.dateYMD,
-          level,
-          note: task.note,
-          value: task.value,
-        };
-      });
+    const completionData = tasks.filter(isDone).map((task) => {
+      const hasNote = task.note && task.note.trim().length > 0;
+      const hasValue = typeof task.value === "number";
+      let level = 1;
+
+      // Dynamically calculate level based on template settings
+      if (template.enableNote && template.enableValue) {
+        // Both features are on
+        if (hasNote) level = 2;
+        if (hasValue) level = 3;
+      } else if (template.enableNote && !template.enableValue) {
+        // Only Note is on
+        if (hasNote) level = 3; // Max level is achievable with a note
+      } else if (!template.enableNote && template.enableValue) {
+        // Only Value is on
+        if (hasValue) level = 3; // Max level is achievable with a value
+      } else {
+        // Neither feature is on
+        level = 3; // Just checking is enough for max level
+      }
+
+      return {
+        date: task.dateYMD,
+        level,
+        note: task.note,
+        value: task.value,
+      };
+    });
 
     res.json({
       id: template.id,

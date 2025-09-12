@@ -2,7 +2,6 @@ import React, { useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useApi } from "../api";
-import { getStyleForPercentage } from "../utils/colorUtils";
 import "./RoutineDetailPage.css";
 
 const MONTHS = [
@@ -240,13 +239,6 @@ export default function RoutineDetailPage() {
   if (error) return <div>오류: {(error as Error).message}</div>;
   if (!routineDetail) return <div>루틴 정보를 찾을 수 없습니다.</div>;
 
-  const totalDays =
-    Math.floor(
-      (new Date().getTime() - new Date(routineDetail.createdAt).getTime()) /
-        (1000 * 60 * 60 * 24)
-    ) + 1;
-  const successRate = (completionMap.size / Math.max(1, totalDays)) * 100;
-
   return (
     <div className="dashboard-page-container">
       <header
@@ -263,15 +255,7 @@ export default function RoutineDetailPage() {
         <div>
           <h1>{routineDetail.title}</h1>
           <p style={{ margin: 0, color: "#aaa" }}>
-            시작일: {new Date(routineDetail.createdAt).toLocaleDateString()} /
-            성공률:{" "}
-            <span
-              className="routine-percentage"
-              style={getStyleForPercentage(successRate)}
-            >
-              {successRate.toFixed(1)}%
-            </span>{" "}
-            ({completionMap.size}/{totalDays} 일)
+            시작일: {new Date(routineDetail.createdAt).toLocaleDateString()}
           </p>
         </div>
       </header>

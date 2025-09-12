@@ -175,8 +175,11 @@
 
 .day-details-list .item.done {
   background-color: rgba(34, 197, 94, 0.1);
-  text-decoration: line-through;
   color: var(--muted);
+}
+
+.day-details-list .item.done .title {
+  text-decoration: line-through;
 }
 
 /* --- 여기를 추가했습니다! --- */
@@ -217,6 +220,11 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.day-details-list .item .note .task-value {
+  font-weight: bold;
+  color: var(--text-color);
 }
 
 .btn-memo {
@@ -367,4 +375,29 @@ input:checked + .slider {
 
 input:checked + .slider:before {
   transform: translateX(14px);
+}
+
+/* --- Login Prompt Styles --- */
+.login-prompt {
+  padding: 2rem 1rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.login-prompt p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.error-message {
+  color: var(--danger);
+  text-align: center;
+  padding: 1rem;
 }

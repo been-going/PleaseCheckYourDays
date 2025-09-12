@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useApi } from "../api"; // Import useApi
-import { FixedCost } from "../api/client"; // Keep type import
+import { useApi } from "../api";
+import { FixedCost } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import "./FixedCosts.css";
 
-export function FixedCosts() {
-  const api = useApi(); // Get the api client
-  const [costs, setCosts] = useState<FixedCost[]>([]);
+function FixedCostsContent() {
+  const api = useApi();
   const { isAuthenticated } = useAuth();
+  const [costs, setCosts] = useState<FixedCost[]>([]);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,7 +27,7 @@ export function FixedCosts() {
     try {
       setLoading(true);
       setError(null);
-      const data = await api.getFixedCosts(); // Use api.getFixedCosts
+      const data = await api.getFixedCosts();
       setCosts(data.sort((a, b) => a.paymentDate - b.paymentDate));
       const sum = data.reduce((acc, cost) => acc + cost.amount, 0);
       setTotal(sum);
@@ -39,7 +39,7 @@ export function FixedCosts() {
     } finally {
       setLoading(false);
     }
-  }, [api, isAuthenticated]); // Add api and isAuthenticated to dependency array
+  }, [api, isAuthenticated]);
 
   useEffect(() => {
     fetchCosts();
@@ -67,7 +67,7 @@ export function FixedCosts() {
     }
 
     try {
-      await api.addFixedCost({ name, amount: amountNum, paymentDate: dateNum }); // Use api.addFixedCost
+      await api.addFixedCost({ name, amount: amountNum, paymentDate: dateNum });
       setName("");
       setAmount("");
       setPaymentDate("");
@@ -87,7 +87,7 @@ export function FixedCosts() {
 
     if (window.confirm("정말로 이 항목을 삭제하시겠습니까?")) {
       try {
-        await api.deleteFixedCost(id); // Use api.deleteFixedCost
+        await api.deleteFixedCost(id);
         await fetchCosts();
       } catch (e: any) {
         setError("삭제에 실패했습니다.");
@@ -97,7 +97,7 @@ export function FixedCosts() {
   };
 
   return (
-    <div className="fixed-costs-container">
+    <>
       <header className="fixed-costs-header">
         <h1>월별 고정비</h1>
         <div className="total-amount">
@@ -148,7 +148,7 @@ export function FixedCosts() {
         </form>
       </div>
 
-      {loading ? (
+      {loading && isAuthenticated ? (
         <div className="card">
           <p style={{ textAlign: "center" }}>로딩 중...</p>
         </div>
@@ -197,6 +197,22 @@ export function FixedCosts() {
             </table>
           )}
         </div>
+      )}
+    </>
+  );
+}
+
+export function FixedCosts() {
+  const { isAuthLoading } = useAuth();
+
+  return (
+    <div className="fixed-costs-container">
+      {isAuthLoading ? (
+        <div className="card">
+          <p style={{ textAlign: "center" }}>Loading...</p>
+        </div>
+      ) : (
+        <FixedCostsContent />
       )}
     </div>
   );
