@@ -1,26 +1,27 @@
 import { Request, Response, NextFunction } from "express";
-import { AnyZodObject, ZodError } from "zod";
+import { ZodError, z } from "zod";
 
 export const validate =
-  (schema: AnyZodObject) =>
-  (req: Request, res: Response, next: NextFunction) => {
+  (schema: z.Schema) =>
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
-      schema.parse({
+      await schema.parseAsync({
         body: req.body,
         query: req.query,
         params: req.params,
       });
-      next();
+      return next();
     } catch (error) {
       if (error instanceof ZodError) {
         return res.status(400).json({
-          status: "fail",
-          errors: error.errors.map((e) => ({
+          message: "Validation failed",
+          // Zod v3+ 에서는 'errors' 대신 'issues'를 사용합니다.
+          errors: error.issues.map((e) => ({
             path: e.path,
             message: e.message,
           })),
         });
       }
-      next(error);
+      return next(error);
     }
   };
