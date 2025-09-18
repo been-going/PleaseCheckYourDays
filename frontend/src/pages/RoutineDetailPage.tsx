@@ -235,28 +235,36 @@ export default function RoutineDetailPage() {
     return map;
   }, [routineDetail]);
 
-  if (isLoading) return <div>로딩 중...</div>;
-  if (error) return <div>오류: {(error as Error).message}</div>;
-  if (!routineDetail) return <div>루틴 정보를 찾을 수 없습니다.</div>;
+  if (isLoading)
+    return (
+      <div className="card" style={{ textAlign: "center", padding: "2rem" }}>
+        로딩 중...
+      </div>
+    );
+  if (error)
+    return (
+      <div className="card error-message">오류: {(error as Error).message}</div>
+    );
+  if (!routineDetail)
+    return (
+      <div className="card" style={{ textAlign: "center", padding: "2rem" }}>
+        루틴 정보를 찾을 수 없습니다.
+      </div>
+    );
 
   return (
     <div className="dashboard-page-container">
-      <header
-        className="page-header"
-        style={{
-          alignItems: "baseline",
-          gap: "1rem",
-          justifyContent: "flex-start",
-        }}
-      >
-        <Link to="/dashboard" className="btn">
-          &larr; 뒤로가기
-        </Link>
-        <div>
-          <h1>{routineDetail.title}</h1>
-          <p style={{ margin: 0, color: "#aaa" }}>
-            시작일: {new Date(routineDetail.createdAt).toLocaleDateString()}
-          </p>
+      <header className="page-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <Link to="/dashboard" className="btn">
+            &larr;
+          </Link>
+          <div>
+            <h1>{routineDetail.title}</h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
+              시작일: {new Date(routineDetail.createdAt).toLocaleDateString()}
+            </p>
+          </div>
         </div>
       </header>
 

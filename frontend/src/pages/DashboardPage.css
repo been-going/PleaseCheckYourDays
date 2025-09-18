@@ -1,121 +1,156 @@
+/* src/pages/DashboardPage.css */
+
 .dashboard-page-container {
-  width: 100%;
   max-width: 1000px;
   margin: 0 auto;
-  padding: 1rem;
-  text-align: left;
-}
-
-.month-selector {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-.month-selector h2 {
-  margin: 0;
-  min-width: 150px;
-  text-align: center;
-}
-
-.month-selector button {
-  background: none;
-  border: 1px solid var(--border-color);
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: 1fr;
   gap: 1.5rem;
 }
 
 .stat-card {
-  background-color: var(--background-color-offset);
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
 }
 
-.stat-card h3 {
-  margin-top: 0;
-  margin-bottom: 1.5rem;
-  text-align: center;
+.stat-card > h3 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
 }
 
-.stat-card p {
-  text-align: center;
-  font-size: 1.1rem;
-  margin-top: 1rem;
-}
-
-.fixed-cost-summary {
+.card-content {
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+}
+
+.routine-list-header {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  height: 100%;
-  gap: 1rem;
+  width: 100%;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
 }
 
-.fixed-cost-summary span {
-  font-size: 1.2rem;
-  color: #888;
+.routine-list-header h3 {
+  font-size: 1.25rem;
 }
 
-.fixed-cost-summary strong {
-  font-size: 2.5rem;
-  color: var(--primary-color);
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-/* Ensure recharts text is visible in dark mode */
-.recharts-text {
-  fill: var(--text-color);
+.sort-control label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.routine-list {
+  width: 100%;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .routine-link {
   text-decoration: none;
   color: inherit;
   display: block;
-  border-radius: 4px;
-  transition: background-color 0.2s ease-in-out;
+  border-radius: var(--border-radius);
 }
 
-.routine-link:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+.routine-link:hover .routine-item {
+  background-color: var(--bg-hover);
 }
 
 .routine-item {
-  border-bottom: 1px solid var(--border, #eee);
-  padding: 10px;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.2s ease;
+}
+
+li:last-child .routine-item {
+  border-bottom: none;
+}
+
+.routine-item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.routine-item-main strong {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 
 .routine-percentage {
   font-weight: bold;
-  margin-left: 16px;
-  padding: 2px 8px;
-  border-radius: 12px; /* Pill shape */
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
   font-size: 0.8rem;
-  min-width: 50px;
+  min-width: 60px;
   text-align: center;
+  color: var(--primary-text);
 }
 
-/* --- 여기를 추가했습니다! --- */
+.routine-progress {
+  height: 6px;
+  background-color: var(--bg-hover);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.routine-progress-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease-in-out;
+}
+
+.routine-item-sub {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+}
+
 .routine-item.archived {
-  opacity: 0.5;
+  opacity: 0.6;
 }
 
 .routine-item.archived strong {
   text-decoration: line-through;
 }
-/* -------------------------- */
+
+.placeholder-text {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--muted);
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.placeholder-text p {
+  margin-bottom: 0.5rem;
+  line-height: 1.7;
+}

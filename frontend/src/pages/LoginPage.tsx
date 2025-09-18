@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api";
 import { useNavigate, Link } from "react-router-dom";
 import "./Auth.css";
@@ -7,28 +7,34 @@ import "./Auth.css";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const api = useApi();
-  const { login: setAuthToken } = useAuth();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const mLogin = useMutation({
+    mutationFn: (credentials: { email: string; password: string }) =>
+      api.login(credentials),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      navigate("/today");
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    try {
-      const token = await api.login({ email, password });
-      setAuthToken(token);
-      navigate("/"); // 로그인 성공 시 메인 페이지로 이동
-    } catch (err: any) {
-      setError(err.message || "로그인에 실패했습니다.");
-    }
+    mLogin.mutate({ email, password });
   };
 
   return (
-    <div className="auth-container">
+    <div className="auth-container card">
       <h2>로그인</h2>
       <form onSubmit={handleSubmit} className="auth-form">
-        {error && <p className="auth-error">{error}</p>}
+        {mLogin.error && (
+          <p className="auth-error">
+            {(mLogin.error as any)?.response?.data?.message ||
+              (mLogin.error as Error).message}
+          </p>
+        )}
         <div className="form-group">
           <label htmlFor="email">이메일</label>
           <input
@@ -49,8 +55,12 @@ export default function LoginPage() {
             required
           />
         </div>
-        <button type="submit" className="btn primary btn-submit">
-          로그인
+        <button
+          type="submit"
+          className="btn primary btn-submit"
+          disabled={mLogin.isPending}
+        >
+          {mLogin.isPending ? "로그인 중..." : "로그인"}
         </button>
       </form>
       <p className="auth-link">

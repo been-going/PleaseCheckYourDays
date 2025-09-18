@@ -2,92 +2,72 @@
 .fixed-costs-container {
   max-width: 800px;
   margin: 0 auto;
-  padding: 1rem 0;
-}
-
-.fixed-costs-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.fixed-costs-header h1 {
-  font-size: 1.75rem;
-  margin: 0;
 }
 
 .total-amount {
   font-size: 1.25rem;
+  color: var(--text-secondary);
 }
 
-.error-message {
-  color: var(--danger);
-  background-color: var(--danger-bg);
-  padding: 0.75rem;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-  text-align: center;
+.total-amount strong {
+  color: var(--text-primary);
+  font-weight: 700;
 }
 
 .add-cost-form {
-  display: flex;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 0.75rem;
   align-items: center;
-}
-
-.add-cost-form input {
-  flex: 1;
-  /* Using global .btn styles by applying className="btn" */
 }
 
 .costs-table-wrapper {
   width: 100%;
-  overflow-x: auto; /* For very small screens */
+  overflow-x: auto;
 }
 
 .costs-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 600px; /* Prevent table from getting too squished */
+  min-width: 600px;
 }
 
 .costs-table th,
 .costs-table td {
-  padding: 12px 15px;
+  padding: 1rem;
   border-bottom: 1px solid var(--border);
   text-align: left;
+  white-space: nowrap;
 }
 
 .costs-table th {
   color: var(--muted);
   font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.costs-table tbody tr:nth-child(even) {
+.costs-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.costs-table tbody tr:hover {
   background-color: var(--bg-hover);
 }
 
 .costs-table .amount-cell {
   text-align: right;
+  font-family: monospace;
+  font-size: 1rem;
 }
 
 .costs-table .actions-cell {
   text-align: center;
 }
 
-/* Responsive Styles */
 @media (max-width: 768px) {
   .add-cost-form {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.75rem;
-  }
-
-  .fixed-costs-header {
-    flex-direction: column;
-    align-items: flex-start;
+    grid-template-columns: 1fr;
   }
 }

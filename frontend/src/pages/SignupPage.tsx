@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { useApi } from "../api";
 import { Link, useNavigate } from "react-router-dom";
 import "./Auth.css";
@@ -6,37 +7,46 @@ import "./Auth.css";
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
   const api = useApi();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setSuccess(false);
-    try {
-      await api.signup({ email, password });
-      setSuccess(true);
-      // Optionally redirect after a delay
+  const mSignup = useMutation({
+    mutationFn: (credentials: { email: string; password: string }) =>
+      api.signup(credentials),
+    onSuccess: () => {
       setTimeout(() => navigate("/login"), 2000);
-    } catch (err: any) {
-      setError(err.message || "회원가입에 실패했습니다.");
-    }
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    mSignup.mutate({ email, password });
   };
 
   return (
-    <div className="auth-container">
+    <div className="auth-container card">
       <h2>회원가입</h2>
-      {success ? (
+      {mSignup.isSuccess ? (
         <div>
           <p className="auth-success">회원가입에 성공했습니다!</p>
-          <p>잠시 후 로그인 페이지로 이동합니다...</p>
-          <Link to="/login">지금 로그인하기</Link>
+          <p style={{ color: "var(--text-secondary)" }}>
+            잠시 후 로그인 페이지로 이동합니다...
+          </p>
+          <Link
+            to="/login"
+            style={{ marginTop: "1rem", display: "inline-block" }}
+          >
+            지금 로그인하기
+          </Link>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="auth-form">
-          {error && <p className="auth-error">{error}</p>}
+          {mSignup.error && (
+            <p className="auth-error">
+              {(mSignup.error as any)?.response?.data?.message ||
+                (mSignup.error as Error).message}
+            </p>
+          )}
           <div className="form-group">
             <label htmlFor="email">이메일</label>
             <input
@@ -57,8 +67,12 @@ export default function SignupPage() {
               required
             />
           </div>
-          <button type="submit" className="btn primary btn-submit">
-            회원가입
+          <button
+            type="submit"
+            className="btn primary btn-submit"
+            disabled={mSignup.isPending}
+          >
+            {mSignup.isPending ? "가입 중..." : "회원가입"}
           </button>
         </form>
       )}

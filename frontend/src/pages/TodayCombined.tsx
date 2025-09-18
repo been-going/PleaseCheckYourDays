@@ -1,12 +1,29 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback, memo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useApi } from "../api";
 import { useAuth } from "../context/AuthContext";
 import type { Template, DailyTask as Task } from "../api/client";
 import { getStyleForPercentage } from "../utils/colorUtils";
 import { localYMD } from "../utils/dateUtils";
 import { MemoModal } from "../components/MemoModal";
-import { TrashModal } from "../components/TrashModal";
+import TrashModal from "../components/TrashModal";
 import { Link } from "react-router-dom";
 import "./TodayCombined.css";
 
@@ -25,7 +42,191 @@ function label(g: Group) {
 
 function sortKey(t: { group: Group; order?: number }) {
   const order = { MORNING: 0, EXECUTE: 1, EVENING: 2 } as const;
-  return order[t.group] * 1000 + ((t as any).order ?? 0);
+  return order[t.group] * 1000 + (t.order ?? 0);
+}
+
+// --- 비로그인 사용자를 위한 목업 데이터 및 미리보기 컴포넌트 ---
+const mockTemplates: Template[] = [
+  {
+    id: "tpl1",
+    title: "아침 조깅하기",
+    group: "MORNING",
+    defaultActive: true,
+    enableNote: true,
+    enableValue: true,
+    order: 1,
+    weight: 1,
+    createdAt: "2023-01-01T00:00:00Z",
+    updatedAt: "2023-01-01T00:00:00Z",
+    isArchived: false,
+  },
+  {
+    id: "tpl2",
+    title: "책 15분 읽기",
+    group: "MORNING",
+    defaultActive: true,
+    enableNote: false,
+    enableValue: false,
+    order: 2,
+    weight: 1,
+    createdAt: "2023-01-01T00:00:00Z",
+    updatedAt: "2023-01-01T00:00:00Z",
+    isArchived: false,
+  },
+  {
+    id: "tpl3",
+    title: "프로젝트 작업 2시간",
+    group: "EXECUTE",
+    defaultActive: true,
+    enableNote: true,
+    enableValue: true,
+    order: 1,
+    weight: 1,
+    createdAt: "2023-01-01T00:00:00Z",
+    updatedAt: "2023-01-01T00:00:00Z",
+    isArchived: false,
+  },
+  {
+    id: "tpl4",
+    title: "오늘 배운 내용 정리",
+    group: "EVENING",
+    defaultActive: true,
+    enableNote: true,
+    enableValue: false,
+    order: 1,
+    weight: 1,
+    createdAt: "2023-01-01T00:00:00Z",
+    updatedAt: "2023-01-01T00:00:00Z",
+    isArchived: false,
+  },
+  {
+    id: "tpl5",
+    title: "내일 계획 세우기",
+    group: "EVENING",
+    defaultActive: true,
+    enableNote: false,
+    enableValue: false,
+    order: 2,
+    weight: 1,
+    createdAt: "2023-01-01T00:00:00Z",
+    updatedAt: "2023-01-01T00:00:00Z",
+    isArchived: false,
+  },
+].sort((a, b) => sortKey(a) - sortKey(b));
+
+function TodayUnauthenticatedPreview() {
+  const dateYMD = localYMD();
+
+  const mockOneoffs: Task[] = [
+    {
+      id: "oneoff1",
+      title: "우체국 가서 택배 보내기",
+      isOneOff: true,
+      checked: false,
+      note: null,
+      dateYMD: dateYMD,
+      value: null,
+      templateId: null,
+      weight: 1,
+      createdAt: "2023-01-01T00:00:00Z",
+      updatedAt: "2023-01-01T00:00:00Z",
+    },
+    {
+      id: "oneoff2",
+      title: "저녁 장보기",
+      isOneOff: true,
+      checked: true,
+      note: "계란, 우유, 양파",
+      dateYMD: dateYMD,
+      value: null,
+      templateId: null,
+      weight: 1,
+      createdAt: "2023-01-01T00:00:00Z",
+      updatedAt: "2023-01-01T00:00:00Z",
+    },
+  ];
+
+  const mockByTplId: Record<string, Task> = {
+    tpl1: {
+      id: "task1",
+      templateId: "tpl1",
+      title: "아침 조깅하기",
+      checked: true,
+      note: "상쾌했다!",
+      dateYMD: dateYMD,
+      value: 0.5,
+      isOneOff: false,
+      weight: 1,
+      createdAt: "2023-01-01T00:00:00Z",
+      updatedAt: "2023-01-01T00:00:00Z",
+    },
+    tpl3: {
+      id: "task3",
+      templateId: "tpl3",
+      title: "프로젝트 작업 2시간",
+      checked: false,
+      note: null,
+      dateYMD: dateYMD,
+      value: 1.5,
+      isOneOff: false,
+      weight: 1,
+      createdAt: "2023-01-01T00:00:00Z",
+      updatedAt: "2023-01-01T00:00:00Z",
+    },
+  };
+
+  return (
+    <div>
+      <div
+        className="card login-prompt-container"
+        style={{
+          position: "sticky",
+          top: "1rem",
+          zIndex: 20,
+          marginBottom: "1rem",
+        }}
+      >
+        <h3>모든 기능을 사용하려면 로그인이 필요합니다</h3>
+        <p>
+          로그인하여 오늘의 할 일과 루틴을 관리하고, 진행 상황을 추적하며
+          생산성을 높여보세요.
+        </p>
+        <Link to="/login" className="btn primary" style={{ marginTop: "1rem" }}>
+          로그인하고 시작하기
+        </Link>
+      </div>
+      <div
+        className="grid today-grid"
+        style={{
+          filter: "grayscale(80%)",
+          opacity: 0.7,
+          pointerEvents: "none",
+        }}
+      >
+        <TodaySummaryCard
+          isAuthenticated={false}
+          templates={mockTemplates}
+          oneoffs={mockOneoffs}
+          byTplId={mockByTplId}
+          dateYMD={dateYMD}
+        />
+        <OneOffTasksCard
+          dateYMD={dateYMD}
+          oneoffs={mockOneoffs}
+          onSetMemoTarget={() => {}}
+          isAuthenticated={false}
+        />
+        <RoutineTemplatesCard
+          templates={mockTemplates}
+          byTplId={mockByTplId}
+          dateYMD={dateYMD}
+          onSetMemoTarget={() => {}}
+          isAuthenticated={false}
+          onOpenTrash={() => {}}
+        />
+      </div>
+    </div>
+  );
 }
 
 function TodayCombinedContent({
@@ -33,24 +234,15 @@ function TodayCombinedContent({
 }: {
   isAuthenticated: boolean;
 }) {
-  // 로그인하지 않은 사용자는 로그인 안내 화면을 표시합니다.
   if (!isAuthenticated) {
-    return (
-      <div className="card login-prompt-container">
-        <h3>로그인이 필요합니다</h3>
-        <p>로그인하여 오늘의 할 일과 루틴을 관리하고 진행 상황을 추적하세요.</p>
-        <Link to="/login" className="btn primary" style={{ marginTop: "1rem" }}>
-          로그인 페이지로 이동
-        </Link>
-      </div>
-    );
+    return <TodayUnauthenticatedPreview />;
   }
 
   const qc = useQueryClient();
   const api = useApi();
 
   const [memoTarget, setMemoTarget] = useState<MemoTarget | null>(null);
-  const [isTrashOpen, setIsTrashOpen] = useState(false);
+  const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
   const [dateYMD] = useState(localYMD());
 
   const qTpl = useQuery({
@@ -125,14 +317,13 @@ function TodayCombinedContent({
           templateId: id,
           dateYMD,
           note: memoText,
-          value: null, // When creating from memo, value is null
+          value: null,
         });
       }
     }
     setMemoTarget(null);
   };
 
-  // 데이터 로딩은 로그인 되었을 때만 의미가 있습니다.
   const isLoading = isAuthenticated && (qTpl.isLoading || qDay.isLoading);
 
   if (isLoading) {
@@ -140,7 +331,7 @@ function TodayCombinedContent({
   }
 
   return (
-    <div className="grid" style={{ gap: 12 }}>
+    <div className="grid today-grid">
       <TodaySummaryCard
         isAuthenticated={isAuthenticated}
         templates={templates}
@@ -152,13 +343,15 @@ function TodayCombinedContent({
         dateYMD={dateYMD}
         oneoffs={allTasks.filter((t) => t.isOneOff)}
         onSetMemoTarget={setMemoTarget}
+        isAuthenticated={isAuthenticated}
       />
       <RoutineTemplatesCard
         templates={templates}
         byTplId={byTplId}
         dateYMD={dateYMD}
         onSetMemoTarget={setMemoTarget}
-        onOpenTrash={() => setIsTrashOpen(true)}
+        isAuthenticated={isAuthenticated}
+        onOpenTrash={() => setIsTrashModalOpen(true)}
       />
       <MemoModal
         isOpen={!!memoTarget}
@@ -168,15 +361,14 @@ function TodayCombinedContent({
         onClose={() => setMemoTarget(null)}
         onSave={handleSaveMemo}
       />
-      <TrashModal isOpen={isTrashOpen} onClose={() => setIsTrashOpen(false)} />
+      <TrashModal
+        isOpen={isTrashModalOpen}
+        onClose={() => setIsTrashModalOpen(false)}
+      />
     </div>
   );
 }
 
-/**
- * 인증 상태 로딩을 처리하는 Wrapper 컴포넌트입니다.
- * isAuthLoading이 true이면 로딩 화면을, false이면 실제 컨텐츠를 렌더링합니다.
- */
 export default function TodayCombined() {
   const { isAuthenticated, isAuthLoading } = useAuth();
 
@@ -189,7 +381,7 @@ export default function TodayCombined() {
 
 // --- Sub Components ---
 
-const TodaySummaryCard = ({
+const TodaySummaryCard = memo(function TodaySummaryCard({
   isAuthenticated,
   templates,
   oneoffs,
@@ -201,7 +393,7 @@ const TodaySummaryCard = ({
   oneoffs: Task[];
   byTplId: Record<string, Task>;
   dateYMD: string;
-}) => {
+}) {
   const { total, done, pct } = useMemo(() => {
     const activeTemplates = templates.filter((t: Template) => t.defaultActive);
     const tplPairs = activeTemplates.map((tpl: Template) => ({
@@ -210,7 +402,7 @@ const TodaySummaryCard = ({
     }));
     const totalCount = tplPairs.length + oneoffs.length;
     const doneCount =
-      tplPairs.filter((p: any) => p.row?.checked === true).length +
+      tplPairs.filter((p) => p.row?.checked === true).length +
       oneoffs.filter((t: Task) => t.checked === true).length;
     return {
       total: totalCount,
@@ -221,12 +413,9 @@ const TodaySummaryCard = ({
 
   return (
     <div className="card">
-      <div
-        className="row"
-        style={{ justifyContent: "space-between", alignItems: "center" }}
-      >
+      <div className="card-header">
         <h3>오늘의 체크리스트</h3>
-        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+        <div className="row" style={{ gap: 8 }}>
           <div className="tag">{dateYMD}</div>
           <div className="tag" style={getStyleForPercentage(pct)}>
             {pct}%
@@ -238,25 +427,26 @@ const TodaySummaryCard = ({
           <i style={{ width: `${pct}%`, ...getStyleForPercentage(pct) }} />
         )}
       </div>
-      <div style={{ color: "var(--muted)", marginTop: 6 }}>
+      <div style={{ color: "var(--muted)", marginTop: 6, fontSize: "0.9rem" }}>
         {done} / {total} 완료
       </div>
     </div>
   );
-};
+});
 
-const OneOffTasksCard = ({
+const OneOffTasksCard = memo(function OneOffTasksCard({
   dateYMD,
   oneoffs,
   onSetMemoTarget,
+  isAuthenticated,
 }: {
   dateYMD: string;
   oneoffs: Task[];
   onSetMemoTarget: (target: MemoTarget) => void;
-}) => {
+  isAuthenticated: boolean;
+}) {
   const qc = useQueryClient();
   const api = useApi();
-  const { isAuthenticated } = useAuth();
   const [oneoffTitle, setOneoffTitle] = useState("");
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
 
@@ -311,18 +501,12 @@ const OneOffTasksCard = ({
 
   return (
     <div className="card">
-      <div
-        className="row"
-        style={{
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <h3>오늘 루틴</h3>
+      <div className="card-header">
+        <h3>오늘 해야 할 일</h3>
         <div className="row" style={{ gap: 8 }}>
           <input
             className="btn"
+            style={{ flex: 1 }}
             placeholder={
               isAuthenticated ? "오늘만 추가…" : "로그인 후 추가 가능"
             }
@@ -337,14 +521,14 @@ const OneOffTasksCard = ({
           <button
             type="button"
             className="btn primary"
-            disabled={!isAuthenticated}
+            disabled={!isAuthenticated || !oneoffTitle.trim()}
             onClick={() =>
               oneoffTitle.trim() &&
               isAuthenticated &&
               mAddOneoff.mutate({ title: oneoffTitle.trim(), dateYMD })
             }
           >
-            오늘만 추가
+            추가
           </button>
         </div>
       </div>
@@ -352,11 +536,31 @@ const OneOffTasksCard = ({
         <div className="list">
           {oneoffs.map((t: Task) => (
             <div key={t.id} className={`item ${t.checked ? "done" : ""}`}>
-              <div className="col">
-                <div className="title">{t.title}</div>
-                {t.note && <div className="note">“{t.note}”</div>}
+              <div className="item-content">
+                <label className="item-title">
+                  <input
+                    type="checkbox"
+                    checked={t.checked}
+                    disabled={!isAuthenticated}
+                    onChange={() =>
+                      mUpdateTask.mutate({
+                        id: t.id,
+                        data: { checked: !t.checked },
+                      })
+                    }
+                  />
+                  <span>{t.title}</span>
+                </label>
+                {(t.note || t.value !== null) && (
+                  <div className="item-note">
+                    {t.value !== null && (
+                      <span className="task-value">[{t.value}시간] </span>
+                    )}
+                    {t.note && `“${t.note}”`}
+                  </div>
+                )}
               </div>
-              <div className="row" style={{ gap: 8, alignItems: "center" }}>
+              <div className="item-actions">
                 <div className="value-input-wrapper">
                   <input
                     type="number"
@@ -373,21 +577,6 @@ const OneOffTasksCard = ({
                   />
                   <span className="value-input-unit">시간</span>
                 </div>
-                <button
-                  type="button"
-                  className={`btn btn-toggle-success ${
-                    t.checked ? "" : "primary"
-                  }`}
-                  disabled={!isAuthenticated}
-                  onClick={() =>
-                    mUpdateTask.mutate({
-                      id: t.id,
-                      data: { checked: !t.checked },
-                    })
-                  }
-                >
-                  {t.checked ? "성공 취소" : "성공"}
-                </button>
                 <button
                   type="button"
                   className="btn"
@@ -418,7 +607,7 @@ const OneOffTasksCard = ({
             </div>
           ))}
           {!isAuthenticated && oneoffs.length === 0 && (
-            <p style={{ textAlign: "center", color: "var(--muted)" }}>
+            <p className="placeholder-text">
               로그인하여 오늘의 할 일을 추가하고 관리하세요.
             </p>
           )}
@@ -426,60 +615,101 @@ const OneOffTasksCard = ({
       </div>
     </div>
   );
+});
+
+const SortableRoutineItem = ({
+  tpl,
+  children,
+}: {
+  tpl: Template;
+  children: React.ReactNode;
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: tpl.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    zIndex: isDragging ? 10 : "auto",
+    position: "relative" as "relative",
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <span className="drag-handle" {...listeners}>
+        ⠿
+      </span>
+      <div style={{ width: "100%" }}>{children}</div>
+    </div>
+  );
 };
 
-const RoutineTemplatesCard = ({
+const RoutineTemplatesCard = memo(function RoutineTemplatesCard({
   templates,
   byTplId,
   dateYMD,
   onSetMemoTarget,
+  isAuthenticated,
   onOpenTrash,
 }: {
   templates: Template[];
   byTplId: Record<string, Task>;
   dateYMD: string;
   onSetMemoTarget: (target: MemoTarget) => void;
+  isAuthenticated: boolean;
   onOpenTrash: () => void;
-}) => {
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
   const qc = useQueryClient();
   const api = useApi();
-  const { isAuthenticated } = useAuth();
-  const [newTplTitle, setNewTplTitle] = useState("");
-  const [newTplGroup, setNewTplGroup] = useState<Group>("EXECUTE");
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const handleGlobalClick = (event: MouseEvent) => {
-      // Find all open menus within the component
       const openMenus = document.querySelectorAll<HTMLDetailsElement>(
         ".routine-group .menu[open]"
       );
-
       openMenus.forEach((menu) => {
-        // If the click happened outside of the current open menu, close it.
         if (!menu.contains(event.target as Node)) {
           menu.open = false;
         }
       });
     };
-
     document.addEventListener("click", handleGlobalClick);
-
-    return () => {
-      document.removeEventListener("click", handleGlobalClick);
-    };
+    return () => document.removeEventListener("click", handleGlobalClick);
   }, []);
+
+  const [internalTemplates, setInternalTemplates] = useState<Template[]>([]);
+  useEffect(() => {
+    setInternalTemplates(
+      [...templates].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    );
+  }, [templates]);
 
   useEffect(() => {
     const initialValues: Record<string, string> = {};
-    templates.forEach((tpl) => {
+    internalTemplates.forEach((tpl) => {
       const today = byTplId[tpl.id];
       if (today) {
         initialValues[tpl.id] = today.value?.toString() ?? "";
       }
     });
     setInputValues(initialValues);
-  }, [templates, byTplId]);
+  }, [internalTemplates, byTplId]);
+
   const invalidateTemplates = () =>
     qc.invalidateQueries({ queryKey: ["templates"] });
   const invalidateToday = () =>
@@ -487,10 +717,7 @@ const RoutineTemplatesCard = ({
 
   const mCreateTpl = useMutation({
     mutationFn: (p: { title: string; group: Group }) => api.createTemplate(p),
-    onSuccess: () => {
-      setNewTplTitle("");
-      invalidateTemplates();
-    },
+    onSuccess: invalidateTemplates,
   });
   const mUpdateTpl = useMutation({
     mutationFn: (p: { id: string; title: string }) =>
@@ -511,6 +738,16 @@ const RoutineTemplatesCard = ({
       data: { enableValue?: boolean; enableNote?: boolean };
     }) => api.updateTemplate(p.id, p.data),
     onSuccess: invalidateTemplates,
+  });
+
+  const mReorderTemplates = useMutation({
+    mutationFn: (p: { updates: { id: string; order: number }[] }) =>
+      api.reorderTemplates(p.updates),
+    onSuccess: invalidateTemplates,
+    onError: () => {
+      alert("순서 변경에 실패했습니다. 페이지를 새로고침합니다.");
+      window.location.reload();
+    },
   });
   const mUpdateTask = useMutation({
     mutationFn: (p: {
@@ -563,33 +800,67 @@ const RoutineTemplatesCard = ({
     onSuccess: invalidateToday,
   });
 
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = internalTemplates.findIndex((t) => t.id === active.id);
+      const newIndex = internalTemplates.findIndex((t) => t.id === over.id);
+
+      const activeTemplate = internalTemplates[oldIndex];
+      const overTemplate = internalTemplates[newIndex];
+
+      if (activeTemplate.group !== overTemplate.group) {
+        return;
+      }
+
+      const reorderedTemplates = arrayMove(
+        internalTemplates,
+        oldIndex,
+        newIndex
+      );
+      setInternalTemplates(reorderedTemplates);
+
+      const groupToUpdate = activeTemplate.group;
+      const updatesForBackend = reorderedTemplates
+        .filter((t) => t.group === groupToUpdate)
+        .map((template, index) => ({
+          id: template.id,
+          order: index,
+        }));
+
+      mReorderTemplates.mutate({ updates: updatesForBackend });
+    }
+  }
+
   const groupedTemplates = useMemo(() => {
     const groups: { [key in Group]?: Template[] } = {
       MORNING: [],
       EXECUTE: [],
       EVENING: [],
     };
-    for (const tpl of templates) {
+    const sorted = [...internalTemplates].sort(
+      (a, b) => (a.order ?? 0) - (b.order ?? 0)
+    );
+    for (const tpl of sorted) {
       if (groups[tpl.group]) groups[tpl.group]!.push(tpl);
     }
     return groups;
-  }, [templates]);
+  }, [internalTemplates]);
+
+  const [newTplTitle, setNewTplTitle] = useState("");
+  const [newTplGroup, setNewTplGroup] = useState<Group>("EXECUTE");
 
   return (
     <div className="card">
-      <div
-        className="row"
-        style={{
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
+      <div className="card-header">
         <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           고정 루틴
           <button
-            className="btn-icon"
+            className="btn"
+            style={{ padding: "0.5rem", lineHeight: 1 }}
             onClick={onOpenTrash}
+            aria-label="휴지통"
             title="휴지통"
             disabled={!isAuthenticated}
           >
@@ -605,11 +876,12 @@ const RoutineTemplatesCard = ({
             value={newTplTitle}
             onChange={(e) => setNewTplTitle(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && newTplTitle.trim() && isAuthenticated)
+              if (e.key === "Enter" && newTplTitle.trim() && isAuthenticated) {
                 mCreateTpl.mutate({
                   title: newTplTitle.trim(),
                   group: newTplGroup,
                 });
+              }
             }}
             disabled={!isAuthenticated}
           />
@@ -626,17 +898,18 @@ const RoutineTemplatesCard = ({
           <button
             type="button"
             className="btn primary"
-            disabled={!isAuthenticated}
-            onClick={() =>
-              newTplTitle.trim() &&
-              isAuthenticated &&
-              mCreateTpl.mutate({
-                title: newTplTitle.trim(),
-                group: newTplGroup,
-              })
-            }
+            disabled={!isAuthenticated || !newTplTitle.trim()}
+            onClick={() => {
+              if (newTplTitle.trim() && isAuthenticated) {
+                mCreateTpl.mutate({
+                  title: newTplTitle.trim(),
+                  group: newTplGroup,
+                });
+                setNewTplTitle("");
+              }
+            }}
           >
-            루틴 추가
+            추가
           </button>
         </div>
       </div>
@@ -645,164 +918,198 @@ const RoutineTemplatesCard = ({
           const groupTemplates = groupedTemplates[group];
           if (!groupTemplates || groupTemplates.length === 0) return null;
           return (
-            <div key={group} className="routine-group">
-              <h4 className="routine-group-title">{label(group)}</h4>
-              <div className="list">
-                {groupTemplates.map((tpl) => {
-                  const today = byTplId[tpl.id];
-                  const success = today?.checked === true;
-                  return (
-                    <div
-                      key={tpl.id}
-                      className={`item ${success ? "done" : ""}`}
-                    >
-                      <div className="col">
-                        <div className="title">{tpl.title}</div>
-                        {tpl.enableNote && today?.note && (
-                          <div className="note">“{today.note}”</div>
-                        )}
-                      </div>
-                      <div
-                        className="row"
-                        style={{ gap: 8, alignItems: "center" }}
-                      >
-                        {tpl.enableValue && (
-                          <div className="value-input-wrapper">
-                            <input
-                              type="number"
-                              className="value-input"
-                              value={inputValues[tpl.id] ?? ""}
-                              onChange={(e) =>
-                                handleValueChange(tpl.id, e.target.value)
-                              }
-                              onBlur={() => handleValueBlur(tpl.id)}
-                              onClick={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter")
-                                  (e.target as HTMLInputElement).blur();
-                              }}
-                              disabled={!isAuthenticated}
-                            />
-                            <span className="value-input-unit">시간</span>
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          className={`btn btn-toggle-success ${
-                            success ? "" : "primary"
-                          }`}
-                          disabled={!isAuthenticated}
-                          onClick={() => {
-                            if (today)
-                              mUpdateTask.mutate({
-                                id: today.id,
-                                data: { checked: !success },
-                              });
-                            else
-                              mCheckTemplate.mutate({
-                                templateId: tpl.id,
-                                dateYMD,
-                                checked: !success,
-                              });
-                          }}
-                        >
-                          {success ? "취소" : "오늘 성공"}
-                        </button>
-                        {tpl.enableNote && (
-                          <button
-                            type="button"
-                            className="btn"
-                            disabled={!isAuthenticated}
-                            onClick={() =>
-                              onSetMemoTarget({
-                                kind: "template",
-                                id: tpl.id,
-                                title: tpl.title,
-                                note: today?.note ?? null,
-                              })
-                            }
-                          >
-                            메모
-                          </button>
-                        )}
-                        <details
-                          className="menu"
-                          {...(!isAuthenticated && {
-                            onClick: (e) => e.preventDefault(),
-                          })}
-                        >
-                          <summary className="btn" disabled={!isAuthenticated}>
-                            ⋯
-                          </summary>
-                          <div className="menu-list">
-                            <button
-                              type="button"
-                              className="menu-item"
-                              onClick={() => {
-                                const next = prompt("새 제목", tpl.title);
-                                if (next)
-                                  mUpdateTpl.mutate({
+            <DndContext
+              key={group}
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={groupTemplates}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="routine-group">
+                  <h4 className="routine-group-title">{label(group)}</h4>
+                  <div className="list">
+                    {groupTemplates.map((tpl) => {
+                      const today = byTplId[tpl.id];
+                      const success = today?.checked === true;
+                      return (
+                        <SortableRoutineItem tpl={tpl} key={tpl.id}>
+                          <div className={`item ${success ? "done" : ""}`}>
+                            <div className="item-content">
+                              <label className="item-title">
+                                <input
+                                  type="checkbox"
+                                  checked={success}
+                                  disabled={!isAuthenticated}
+                                  onChange={() => {
+                                    if (today) {
+                                      mUpdateTask.mutate({
+                                        id: today.id,
+                                        data: { checked: !success },
+                                      });
+                                    } else {
+                                      mCheckTemplate.mutate({
+                                        templateId: tpl.id,
+                                        dateYMD,
+                                        checked: !success,
+                                      });
+                                    }
+                                  }}
+                                />
+                                <span>{tpl.title}</span>
+                              </label>
+                              {today &&
+                                ((tpl.enableNote && today.note) ||
+                                  (tpl.enableValue &&
+                                    today.value !== null)) && (
+                                  <div className="item-note">
+                                    {tpl.enableValue &&
+                                      today.value !== null && (
+                                        <span className="task-value">
+                                          [{today.value}시간]{" "}
+                                        </span>
+                                      )}
+                                    {tpl.enableNote &&
+                                      today.note &&
+                                      `“${today.note}”`}
+                                  </div>
+                                )}
+                            </div>
+                            <div className="item-actions">
+                              <div
+                                className="value-input-wrapper"
+                                style={{
+                                  visibility: tpl.enableValue
+                                    ? "visible"
+                                    : "hidden",
+                                }}
+                              >
+                                <input
+                                  type="number"
+                                  className="value-input"
+                                  value={inputValues[tpl.id] ?? ""}
+                                  onChange={(e) =>
+                                    handleValueChange(tpl.id, e.target.value)
+                                  }
+                                  onBlur={() => handleValueBlur(tpl.id)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter")
+                                      (e.target as HTMLInputElement).blur();
+                                  }}
+                                  disabled={
+                                    !isAuthenticated || !tpl.enableValue
+                                  }
+                                />
+                                <span className="value-input-unit">시간</span>
+                              </div>
+                              <button
+                                type="button"
+                                className="btn"
+                                disabled={!isAuthenticated || !tpl.enableNote}
+                                style={{
+                                  visibility: tpl.enableNote
+                                    ? "visible"
+                                    : "hidden",
+                                }}
+                                onClick={() => {
+                                  if (!tpl.enableNote) return;
+                                  onSetMemoTarget({
+                                    kind: "template",
                                     id: tpl.id,
-                                    title: next,
+                                    title: tpl.title,
+                                    note: today?.note ?? null,
                                   });
-                              }}
-                            >
-                              제목 수정
-                            </button>
-                            <button
-                              type="button"
-                              className="menu-item"
-                              onClick={() => {
-                                mUpdateTplFlags.mutate({
-                                  id: tpl.id,
-                                  data: { enableNote: !tpl.enableNote },
-                                });
-                              }}
-                            >
-                              {tpl.enableNote
-                                ? "메모 작성 끄기"
-                                : "메모 작성 켜기"}
-                            </button>
-                            <button
-                              type="button"
-                              className="menu-item"
-                              onClick={() => {
-                                mUpdateTplFlags.mutate({
-                                  id: tpl.id,
-                                  data: { enableValue: !tpl.enableValue },
-                                });
-                              }}
-                            >
-                              {tpl.enableValue
-                                ? "시간 작성 끄기"
-                                : "시간 작성 켜기"}
-                            </button>
-                            <button
-                              type="button"
-                              className="menu-item"
-                              onClick={() => {
-                                if (
-                                  confirm(
-                                    `'${tpl.title}' 루틴을 휴지통으로 이동하시겠습니까? (기록은 유지됩니다)`
-                                  )
-                                ) {
-                                  mDeleteTpl.mutate(tpl.id);
-                                }
-                              }}
-                            >
-                              삭제 (보관)
-                            </button>
+                                }}
+                              >
+                                메모
+                              </button>
+                              <details
+                                className="menu"
+                                {...(!isAuthenticated && {
+                                  onClick: (e) => e.preventDefault(),
+                                })}
+                              >
+                                <summary
+                                  className="btn"
+                                  disabled={!isAuthenticated}
+                                >
+                                  ⋯
+                                </summary>
+                                <div className="menu-list">
+                                  <button
+                                    type="button"
+                                    className="menu-item"
+                                    onClick={() => {
+                                      const next = prompt("새 제목", tpl.title);
+                                      if (next)
+                                        mUpdateTpl.mutate({
+                                          id: tpl.id,
+                                          title: next,
+                                        });
+                                    }}
+                                  >
+                                    제목 수정
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="menu-item"
+                                    onClick={() => {
+                                      mUpdateTplFlags.mutate({
+                                        id: tpl.id,
+                                        data: { enableNote: !tpl.enableNote },
+                                      });
+                                    }}
+                                  >
+                                    {tpl.enableNote
+                                      ? "메모 작성 끄기"
+                                      : "메모 작성 켜기"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="menu-item"
+                                    onClick={() => {
+                                      mUpdateTplFlags.mutate({
+                                        id: tpl.id,
+                                        data: { enableValue: !tpl.enableValue },
+                                      });
+                                    }}
+                                  >
+                                    {tpl.enableValue
+                                      ? "시간 작성 끄기"
+                                      : "시간 작성 켜기"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="menu-item"
+                                    onClick={() => {
+                                      if (
+                                        confirm(
+                                          `'${tpl.title}' 루틴을 휴지통으로 이동하시겠습니까? (기록은 유지됩니다)`
+                                        )
+                                      ) {
+                                        mDeleteTpl.mutate(tpl.id);
+                                      }
+                                    }}
+                                  >
+                                    삭제 (보관)
+                                  </button>
+                                </div>
+                              </details>
+                            </div>
                           </div>
-                        </details>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+                        </SortableRoutineItem>
+                      );
+                    })}
+                  </div>
+                </div>
+              </SortableContext>
+            </DndContext>
           );
         })}
       </div>
     </div>
   );
-};
+});

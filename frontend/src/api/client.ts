@@ -1,40 +1,10 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4001";
+import axiosInstance from "./axios";
 
-export async function api<T = any>(
-  path: string,
-  init?: RequestInit
-): Promise<T> {
-  const token = localStorage.getItem("authToken");
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...((init?.headers as Record<string, string>) || {}),
-  };
+// ─────────────────────────── User ───────────────────────────
 
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-  });
-
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    throw new Error(errorBody.message || `${res.status} ${res.statusText}`);
-  }
-
-  if (path.includes("/login")) {
-    const body = await res.json();
-    return body.token as T;
-  }
-
-  const contentType = res.headers.get("content-type");
-  if (contentType && contentType.indexOf("application/json") !== -1) {
-    return res.json();
-  }
-
-  return {} as T;
+export interface User {
+  id: string;
+  email: string;
 }
 
 // ─────────────────────────── Auth ───────────────────────────
@@ -42,21 +12,23 @@ export async function api<T = any>(
 export async function login(credentials: {
   email: string;
   password: string;
-}): Promise<string> {
-  return api("/api/auth/login", {
-    method: "POST",
-    body: JSON.stringify(credentials),
-  });
+}): Promise<{ message: string }> {
+  const { data } = await axiosInstance.post("/auth/login", credentials);
+  return data;
 }
 
-export async function signup(credentials: {
-  email: string;
-  password: string;
-}): Promise<{ message: string; userId: string }> {
-  return api("/api/auth/signup", {
-    method: "POST",
-    body: JSON.stringify(credentials),
-  });
+export async function signup(credentials: { email: string; password: string }) {
+  const { data } = await axiosInstance.post("/auth/signup", credentials);
+  return data;
+}
+
+export async function logout(): Promise<void> {
+  await axiosInstance.post("/auth/logout");
+}
+
+export async function getMe(): Promise<{ user: User }> {
+  const { data } = await axiosInstance.get("/auth/me");
+  return data;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,25 +45,24 @@ export interface DailyTask {
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
   templateId: string | null;
-  template?: {
-    group: string;
-  };
 }
 
 export async function getDailyTasks(
   date: string // YYYY-MM-DD
-): Promise<{ dateYMD: string; tasks: DailyTask[] }> {
-  return api(`/api/daily/tasks?date=${date}`);
+): Promise<{ tasks: DailyTask[] }> {
+  const { data } = await axiosInstance.get(`/daily/tasks?date=${date}`);
+  return data;
 }
 
-// --- 여기를 추가했습니다! ---
 export async function getTasksForRange(
   from: string,
   to: string
 ): Promise<DailyTask[]> {
-  return api(`/api/daily/tasks/range?from=${from}&to=${to}`);
+  const { data } = await axiosInstance.get(
+    `/daily/tasks/range?from=${from}&to=${to}`
+  );
+  return data;
 }
-// --------------------------
 
 // ─────────────────────────── Fixed Costs ───────────────────────────
 
@@ -105,7 +76,8 @@ export interface FixedCost {
 }
 
 export async function getFixedCosts(): Promise<FixedCost[]> {
-  return api("/api/fixed-costs");
+  const { data } = await axiosInstance.get("/fixed-costs");
+  return data;
 }
 
 export async function addFixedCost(data: {
@@ -113,48 +85,12 @@ export async function addFixedCost(data: {
   amount: number;
   paymentDate: number;
 }): Promise<FixedCost> {
-  return api("/api/fixed-costs", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  const { data: responseData } = await axiosInstance.post("/fixed-costs", data);
+  return responseData;
 }
 
-export async function updateFixedCost(
-  id: string,
-  data: Partial<{ name: string; amount: number; paymentDate: number }>
-): Promise<FixedCost> {
-  return api(`/api/fixed-costs/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function deleteFixedCost(id: string): Promise<{ ok: boolean }> {
-  return api(`/api/fixed-costs/${id}`, {
-    method: "DELETE",
-  });
-}
-
-// ─────────────────────────── Stats ───────────────────────────
-
-export interface StatsData {
-  taskStats: {
-    total: number;
-    completed: number;
-    completionRate: number;
-  };
-  categoryStats: Array<{ name: string; count: number }>;
-  fixedCostStats: {
-    total: number;
-    count: number;
-  };
-}
-
-export async function getStats(
-  year: number,
-  month: number
-): Promise<StatsData> {
-  return api(`/api/stats?year=${year}&month=${month}`);
+export async function deleteFixedCost(id: string): Promise<void> {
+  await axiosInstance.delete(`/fixed-costs/${id}`);
 }
 
 // ─────────────────────────── Dashboard - Routines ───────────────────────────
@@ -177,7 +113,10 @@ export async function getRoutineStats(
   if (limit !== undefined) {
     params.append("limit", String(limit));
   }
-  return api(`/api/dashboard/routines?${params.toString()}`);
+  const { data } = await axiosInstance.get(
+    `/dashboard/routines?${params.toString()}`
+  );
+  return data;
 }
 
 export interface RoutineDetail {
@@ -193,7 +132,8 @@ export interface RoutineDetail {
 }
 
 export async function getRoutineDetail(id: string): Promise<RoutineDetail> {
-  return api(`/api/routines/${id}`);
+  const { data } = await axiosInstance.get(`/routines/${id}`);
+  return data;
 }
 
 // ─────────────────────────── Templates ───────────────────────────
@@ -213,61 +153,62 @@ export interface Template {
 }
 
 export async function getTemplates(): Promise<Template[]> {
-  return api("/api/templates");
+  const { data } = await axiosInstance.get("/templates");
+  return data;
 }
 
 export async function getAllTemplates(): Promise<Template[]> {
-  return api("/api/templates/all");
+  const { data } = await axiosInstance.get("/templates/all");
+  return data;
 }
 
 export async function createTemplate(data: {
   title: string;
   group: string;
 }): Promise<Template> {
-  return api("/api/templates", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  const { data: responseData } = await axiosInstance.post("/templates", data);
+  return responseData;
 }
 
 export async function updateTemplate(
   id: string,
   data: Partial<Omit<Template, "id" | "createdAt" | "updatedAt" | "isArchived">>
 ): Promise<Template> {
-  return api(`/api/templates/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
-  });
+  const { data: responseData } = await axiosInstance.put(
+    `/templates/${id}`,
+    data
+  );
+  return responseData;
 }
 
-export async function deleteTemplate(id: string): Promise<{}> {
-  return api(`/api/templates/${id}`, {
-    method: "DELETE",
-  });
+export async function reorderTemplates(
+  updates: { id: string; order: number }[]
+): Promise<void> {
+  await axiosInstance.patch("/templates/reorder", { updates });
 }
 
-export async function getArchivedTemplates(): Promise<Template[]> {
-  return api("/api/templates/archived");
+export async function deleteTemplate(id: string): Promise<void> {
+  await axiosInstance.delete(`/templates/${id}`);
+}
+
+export async function getTrash(): Promise<Template[]> {
+  const { data } = await axiosInstance.get("/templates/trash");
+  return data;
 }
 
 export async function restoreTemplate(id: string): Promise<Template> {
-  return api(`/api/templates/${id}/restore`, {
-    method: "PUT",
-  });
+  const { data } = await axiosInstance.post(`/templates/${id}/restore`);
+  return data;
 }
 
-export async function deleteTemplatePermanently(
-  id: string
-): Promise<{ ok: boolean }> {
-  return api(`/api/templates/${id}/permanent`, {
-    method: "DELETE",
-  });
+export async function permanentDelete(id: string): Promise<void> {
+  await axiosInstance.delete(`/templates/${id}/permanent`);
 }
 
 // ─────────────────────────── Goals ───────────────────────────
 
 export interface Goal {
-  id: number;
+  id: string;
   title: string;
   description: string | null;
   startDate: string; // ISO date string
@@ -280,7 +221,8 @@ export interface Goal {
 }
 
 export async function getGoals(): Promise<Goal[]> {
-  return api("/api/goals");
+  const { data } = await axiosInstance.get("/goals");
+  return data;
 }
 
 export async function createGoal(data: {
@@ -289,14 +231,12 @@ export async function createGoal(data: {
   startDate: string;
   targetDate: string;
 }): Promise<Goal> {
-  return api("/api/goals", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  const { data: responseData } = await axiosInstance.post("/goals", data);
+  return responseData;
 }
 
 export async function updateGoal(
-  id: number,
+  id: string,
   data: Partial<{
     title: string;
     description: string;
@@ -305,16 +245,12 @@ export async function updateGoal(
     isAchieved: boolean;
   }>
 ): Promise<Goal> {
-  return api(`/api/goals/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
-  });
+  const { data: responseData } = await axiosInstance.put(`/goals/${id}`, data);
+  return responseData;
 }
 
-export async function deleteGoal(id: number): Promise<{ ok: boolean }> {
-  return api(`/api/goals/${id}`, {
-    method: "DELETE",
-  });
+export async function deleteGoal(id: string): Promise<void> {
+  await axiosInstance.delete(`/goals/${id}`);
 }
 
 // New functions for DailyTask operations
@@ -322,20 +258,23 @@ export async function addOneoff(data: {
   title: string;
   dateYMD: string;
 }): Promise<DailyTask> {
-  return api("/api/daily/oneoff", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  const { data: responseData } = await axiosInstance.post(
+    "/daily/tasks/oneoff",
+    data
+  );
+  return responseData;
 }
 
 export async function updateTask(
   id: string,
   data: Partial<{ checked: boolean; note: string; value: number | null }>
 ): Promise<DailyTask> {
-  return api(`/api/tasks/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(data),
-  });
+  // Note: The backend route is /api/tasks/:id
+  const { data: responseData } = await axiosInstance.patch(
+    `/tasks/${id}`,
+    data
+  );
+  return responseData;
 }
 
 export async function upsertTaskFromTemplate(data: {
@@ -345,26 +284,13 @@ export async function upsertTaskFromTemplate(data: {
   note?: string;
   value?: number | null;
 }): Promise<DailyTask> {
-  return api("/api/daily/check", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  const { data: responseData } = await axiosInstance.post("/daily/check", data);
+  return responseData;
 }
 
-export async function createTask(data: {
-  dateYMD: string;
-  templateId: string;
-  checked: boolean;
-  note?: string;
-  value?: number;
-}): Promise<DailyTask> {
-  return upsertTaskFromTemplate(data);
-}
-
-export async function deleteTask(id: string): Promise<{}> {
-  return api(`/api/tasks/${id}`, {
-    method: "DELETE",
-  });
+export async function deleteTask(id: string): Promise<void> {
+  // Note: The backend route is /api/tasks/:id
+  await axiosInstance.delete(`/tasks/${id}`);
 }
 
 // ─────────────────────────── Daily Summaries ───────────────────────────
@@ -379,27 +305,16 @@ export async function getDailySummaries(
   from: string,
   to: string
 ): Promise<DailySummary[]> {
-  return api(`/api/summaries?from=${from}&to=${to}`);
-}
-
-// --- NEWLY ADDED FOR REFACTORING ---
-
-export async function initToday(): Promise<{
-  dateYMD: string;
-  tasks: DailyTask[];
-  summary: DailySummary;
-}> {
-  return api("/api/daily/init", { method: "POST" });
+  const { data } = await axiosInstance.get(`/summaries?from=${from}&to=${to}`);
+  return data;
 }
 
 export async function upsertTaskNote(data: {
   dateYMD: string;
   templateId: string;
-  note: string;
+  note?: string | null;
   value?: number | null;
 }): Promise<DailyTask> {
-  return api("/api/daily/note", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  const { data: responseData } = await axiosInstance.post("/daily/note", data);
+  return responseData;
 }

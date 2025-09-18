@@ -1,3 +1,19 @@
+/* src/pages/RoutineDetailPage.css */
+
+.month-selector {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.month-selector h2 {
+  margin: 0;
+  min-width: 150px;
+  text-align: center;
+}
+
 .heatmap-wrapper {
   width: 100%;
   overflow-x: auto;
@@ -17,6 +33,7 @@
   display: flex;
   position: relative;
   height: 1rem;
+  padding-left: 32px; /* Space for weekday labels */
 }
 
 .heatmap-months > div {
@@ -41,7 +58,7 @@
 
 .heatmap-weekdays > div {
   height: 16px;
-  width: 24px; /* Give it some space */
+  width: 24px;
   display: flex;
   align-items: center;
 }
@@ -69,9 +86,8 @@
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
 }
 
-/* --- Level-based colors --- */
 .heatmap-cell.level-0 {
-  background-color: var(--heatmap-bg-empty, #374151);
+  background-color: var(--bg-hover);
 }
 .heatmap-cell.level-1 {
   background-color: #0e4429;
@@ -85,7 +101,7 @@
 
 .heatmap-cell.future {
   background-color: transparent;
-  border: 1px dashed var(--border, #444);
+  border: 1px dashed var(--border);
   cursor: default;
 }
 
@@ -104,7 +120,6 @@
   box-shadow: none;
 }
 
-/* --- Legend Styles --- */
 .heatmap-legend {
   display: flex;
   align-items: center;
@@ -118,20 +133,13 @@
 
 .heatmap-legend .heatmap-cell {
   cursor: pointer;
-  transition: transform 0.2s ease, outline-color 0.2s ease;
-}
-
-.heatmap-legend .heatmap-cell:hover {
-  transform: scale(1.2);
 }
 
 .heatmap-legend .heatmap-cell.active {
-  outline: 2px solid var(--primary-color, #0088fe);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
-  transform: scale(1.2);
 }
 
-/* --- Filtering Styles --- */
 .stat-card[data-filter-level]:not([data-filter-level=""]) .heatmap-cell {
   opacity: 0.15;
   transform: scale(0.95);
@@ -151,21 +159,18 @@
   transform: scale(1);
 }
 
-/* --- Tooltip Styles --- */
 .heatmap-tooltip {
   position: fixed;
-  background-color: #1a1a1a;
-  color: #fff;
+  background-color: var(--bg-offset);
+  color: var(--text-primary);
   padding: 0.5rem 0.75rem;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.85rem;
   z-index: 1000;
-  pointer-events: none; /* So it doesn't interfere with mouse events on cells */
+  pointer-events: none;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  border: 1px solid #555;
-
-  /* Animation properties */
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
   transition: opacity 0.2s ease-out, transform 0.2s ease-out, visibility 0.2s;
 }
 
@@ -177,23 +182,14 @@
   margin-left: -5px;
   border-width: 5px;
   border-style: solid;
-  border-color: #1a1a1a transparent transparent transparent;
+  border-color: var(--bg-offset) transparent transparent transparent;
 }
 
 .heatmap-tooltip-content strong {
-  color: #ccc;
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .heatmap-tooltip-content div:not(:first-child) {
   margin-top: 0.25rem;
-}
-
-.routine-percentage {
-  font-weight: bold;
-  padding: 2px 8px;
-  border-radius: 12px; /* Pill shape */
-  font-size: 0.8rem;
-  min-width: 50px;
-  text-align: center;
-  display: inline-block;
 }

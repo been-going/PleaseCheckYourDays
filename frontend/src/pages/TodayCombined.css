@@ -1,5 +1,43 @@
+/* src/pages/TodayCombined.css */
+
+.today-grid {
+  gap: 1rem;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.card-header h3 {
+  font-size: 1.2rem;
+}
+
+.login-prompt-container {
+  text-align: center;
+  padding: 2rem;
+}
+
+.login-prompt-container h3 {
+  margin-bottom: 0.5rem;
+}
+
+.login-prompt-container p {
+  color: var(--text-secondary);
+  max-width: 450px;
+  margin: 0 auto 1.5rem auto;
+}
+
+.section {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1.5rem;
+}
+
 .routine-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
 }
 
 .routine-group:last-child {
@@ -7,22 +45,20 @@
 }
 
 .routine-group-title {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin: 0 0 0.75rem 0.25rem;
-  border-bottom: 1px solid var(--border);
+  margin: 0 0 1rem 0;
   padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
 }
-
-/* --- 아래 스타일이 추가되었습니다 --- */
 
 .list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .item {
@@ -30,45 +66,81 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.75rem;
-  border-radius: 6px;
-  background-color: var(--bg-offset, #3a3a3a);
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius);
+  background-color: var(--bg-offset);
   transition: background-color 0.2s ease;
+  width: 100%;
 }
 
 .item:hover {
-  background-color: var(--bg-hover, #4a4a4a);
+  background-color: var(--bg-hover);
 }
 
-.item.done .title {
+.item.done {
+  background-color: rgba(74, 222, 128, 0.05);
+}
+
+.item.done .item-title span {
   text-decoration: line-through;
   color: var(--muted);
 }
 
-.col {
-  flex: 1; /* 사용 가능한 모든 공간을 차지 */
-  min-width: 0; /* 내용이 길어져도 줄어들 수 있도록 설정 (핵심) */
+.item-content {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  text-align: left;
 }
 
-.title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+.item-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.item-title input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.item-title span {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.note {
-  font-size: 0.8rem;
+.item-note {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-left: calc(18px + 0.75rem); /* checkbox width + gap */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-note .task-value {
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.drag-handle {
+  cursor: grab;
+  touch-action: none;
+  padding: 0 8px;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 1.2rem;
 }
 
 .value-input-wrapper {
@@ -81,12 +153,7 @@
   width: 70px;
   padding: 0.5rem;
   text-align: left;
-  padding-right: 2.2em; /* Make space for the unit */
-  border-radius: 6px;
-  border: 1px solid var(--input-border);
-  background-color: var(--input-bg);
-  color: var(--input-text);
-  font-size: 0.9rem;
+  padding-right: 2.2em;
 }
 
 .value-input-unit {
@@ -94,24 +161,16 @@
   right: 0.6rem;
   color: var(--muted);
   font-size: 0.9rem;
-  font-weight: bold;
-  pointer-events: none; /* So it doesn't interfere with input clicks */
+  pointer-events: none;
 }
 
-/* Hide number input spinners for a cleaner look */
 .value-input::-webkit-outer-spin-button,
 .value-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-
 .value-input[type="number"] {
   -moz-appearance: textfield;
-}
-
-.btn-toggle-success {
-  min-width: 95px;
-  justify-content: center;
 }
 
 .menu {
@@ -122,6 +181,7 @@
 .menu > summary {
   list-style: none;
   cursor: pointer;
+  padding: 0.5rem;
 }
 .menu > summary::-webkit-details-marker {
   display: none;
@@ -131,9 +191,9 @@
   position: absolute;
   right: 0;
   top: calc(100% + 5px);
-  background-color: var(--card);
+  background-color: var(--bg-hover);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 0.5rem;
   z-index: 10;
   width: max-content;
@@ -151,29 +211,47 @@
   padding: 0.5rem 0.75rem;
   border-radius: 4px;
   cursor: pointer;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .menu-item:hover {
-  background-color: var(--bg-hover);
+  background-color: var(--primary);
+  color: var(--primary-text);
 }
 
-.login-prompt-container {
-  padding: 2rem;
+.placeholder-text {
   text-align: center;
+  color: var(--muted);
+  padding: 1rem 0;
+}
+
+/* Styles for TrashModal */
+.trash-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
+}
+
+.trash-item {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 1rem;
+  padding: 0.75rem;
+  border-radius: var(--border-radius);
+  background-color: var(--bg-offset);
 }
 
-.login-prompt-container h3 {
-  margin: 0;
-  font-size: 1.5rem;
+.trash-item-title {
+  flex-grow: 1;
 }
 
-.login-prompt-container p {
-  margin: 0;
-  color: var(--muted);
-  max-width: 400px;
-  line-height: 1.6;
+.trash-item-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }

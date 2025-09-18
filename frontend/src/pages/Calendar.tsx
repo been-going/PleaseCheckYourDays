@@ -21,29 +21,73 @@ type MemoTarget =
 
 type DisplayTask = DailyTask & { isArchived: boolean; enableNote: boolean };
 
+const CircularProgress = ({
+  percentage,
+  size = 80,
+}: {
+  percentage: number;
+  size?: number;
+}) => {
+  const strokeWidth = 8;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percentage / 100) * circumference;
+  const style = getStyleForPercentage(percentage);
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className="circular-progress"
+    >
+      <circle
+        className="progress-background"
+        strokeWidth={strokeWidth}
+        r={radius}
+        cx={size / 2}
+        cy={size / 2}
+      />
+      <circle
+        className="progress-bar"
+        strokeWidth={strokeWidth}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        r={radius}
+        cx={size / 2}
+        cy={size / 2}
+        style={{ stroke: style.background }}
+      />
+      <text
+        className="progress-text"
+        x="50%"
+        y="50%"
+        dy=".3em"
+        textAnchor="middle"
+      >
+        {`${percentage}%`}
+      </text>
+    </svg>
+  );
+};
+
 const DayDetails = ({
   selectedDate,
   onSetMemoTarget,
   isAuthenticated,
-  allTemplates, // Prop으로 받음
+  allTemplates,
+  tasks,
+  isLoading,
 }: {
   selectedDate: string;
   onSetMemoTarget: (target: MemoTarget) => void;
   isAuthenticated: boolean;
-  allTemplates: Template[]; // Prop 타입
+  allTemplates: Template[];
+  tasks: DailyTask[];
+  isLoading: boolean;
 }) => {
   const qc = useQueryClient();
   const api = useApi();
-
-  const {
-    data: dayTasksData,
-    isLoading: isLoadingTasks,
-    error,
-  } = useQuery({
-    queryKey: ["tasks", selectedDate],
-    queryFn: () => api.getDailyTasks(selectedDate),
-    enabled: !!selectedDate && isAuthenticated,
-  });
 
   const mToggleCheck = useMutation({
     mutationFn: (p: {
@@ -56,7 +100,6 @@ const DayDetails = ({
         ? api.updateTask(p.id, { checked: p.checked })
         : api.upsertTaskFromTemplate({ ...p }),
     onSuccess: (_, variables) => {
-      // 이제 부모 컴포넌트에서 관리하는 월별 task 쿼리를 무효화합니다.
       const from = localYMD(firstOfMonth(new Date(variables.dateYMD)));
       const to = localYMD(lastOfMonth(new Date(variables.dateYMD)));
       qc.invalidateQueries({ queryKey: ["tasks", "range", from, to] });
@@ -64,13 +107,12 @@ const DayDetails = ({
     },
   });
 
-  const displayTasks = useMemo(() => {
-    if (!isAuthenticated) {
-      return [];
+  const { displayTasks, doneCount, totalCount, pct } = useMemo(() => {
+    if (!isAuthenticated || !allTemplates) {
+      return { displayTasks: [], doneCount: 0, totalCount: 0, pct: 0 };
     }
-    if (!dayTasksData || !allTemplates) return [];
 
-    const allTasksForDay = dayTasksData.tasks ?? [];
+    const allTasksForDay = tasks ?? [];
     const existingTemplateTaskIds = new Set(
       allTasksForDay.filter((t) => t.templateId).map((t) => t.templateId!)
     );
@@ -78,15 +120,11 @@ const DayDetails = ({
     const placeholderTemplates = allTemplates.filter((tpl) => {
       if (!tpl.defaultActive) return false;
       if (existingTemplateTaskIds.has(tpl.id)) return false;
-
       const createdAtDate = tpl.createdAt.substring(0, 10);
       if (selectedDate < createdAtDate) return false;
-
       if (tpl.isArchived) {
         const archivedAtDate = tpl.updatedAt.substring(0, 10);
-        if (selectedDate >= archivedAtDate) {
-          return false;
-        }
+        if (selectedDate >= archivedAtDate) return false;
       }
       return true;
     });
@@ -119,14 +157,97 @@ const DayDetails = ({
       };
     });
 
-    return [...augmentedRealTasks, ...placeholderTasks].sort(
+    const finalTasks = [...augmentedRealTasks, ...placeholderTasks].sort(
       (a, b) => (a.isOneOff ? 1 : 0) - (b.isOneOff ? 1 : 0)
     );
-  }, [isAuthenticated, dayTasksData, allTemplates, selectedDate]);
+
+    const total = finalTasks.length;
+    if (total === 0) {
+      return { displayTasks: [], doneCount: 0, totalCount: 0, pct: 0 };
+    }
+    const done = finalTasks.filter((t) => t.checked).length;
+    return {
+      displayTasks: finalTasks,
+      doneCount: done,
+      totalCount: total,
+      pct: Math.round((done / total) * 100),
+    };
+  }, [isAuthenticated, tasks, allTemplates, selectedDate]);
+
+  const { routineTasks, oneOffTasks } = useMemo(
+    () => ({
+      routineTasks: displayTasks.filter((t) => !t.isOneOff),
+      oneOffTasks: displayTasks.filter((t) => t.isOneOff),
+    }),
+    [displayTasks]
+  );
+
+  const TaskItem = ({ task }: { task: DisplayTask }) => (
+    <div
+      className={`item ${task.checked ? "done" : ""} ${
+        task.isArchived ? "archived" : ""
+      }`}
+    >
+      <div className="item-content">
+        <label className="item-title">
+          <input
+            type="checkbox"
+            checked={task.checked}
+            disabled={!isAuthenticated || task.isArchived}
+            onChange={(e) =>
+              mToggleCheck.mutate({
+                id: task.id.startsWith("placeholder-") ? undefined : task.id,
+                templateId: task.templateId ?? undefined,
+                checked: e.target.checked,
+                dateYMD: selectedDate,
+              })
+            }
+          />
+          <span>{task.title}</span>
+        </label>
+        {(task.note || task.value !== null) && (
+          <div className="item-note">
+            {task.value !== null && (
+              <span className="task-value">[{task.value}시간] </span>
+            )}
+            {task.enableNote && task.note && `“${task.note}”`}
+          </div>
+        )}
+      </div>
+      {task.enableNote && !task.isOneOff && (
+        <button
+          className="btn-memo"
+          disabled={!isAuthenticated || task.isArchived}
+          aria-label="메모"
+          onClick={() =>
+            onSetMemoTarget({
+              kind: "template",
+              templateId: task.templateId!,
+              title: task.title,
+              note: task.note,
+            })
+          }
+        >
+          📝
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="day-details-container">
-      <h3 className="day-details-header">{selectedDate} 루틴</h3>
+      {isAuthenticated && (
+        <div className="day-details-summary">
+          <CircularProgress percentage={pct} />
+          <div className="day-details-info">
+            <h3 className="day-details-date">{selectedDate}</h3>
+            <p className="day-details-stats">
+              {doneCount} / {totalCount} 완료
+            </p>
+          </div>
+        </div>
+      )}
+
       {!isAuthenticated ? (
         <div className="login-prompt">
           <p>로그인하여 {selectedDate}의 루틴을 관리해보세요.</p>
@@ -134,69 +255,31 @@ const DayDetails = ({
             로그인
           </Link>
         </div>
-      ) : isLoadingTasks ? (
-        <p style={{ textAlign: "center", color: "var(--muted)" }}>로딩 중...</p>
-      ) : error ? (
-        <p className="error-message">태스크를 불러오는 데 실패했습니다.</p>
+      ) : isLoading ? (
+        <p className="placeholder-text">로딩 중...</p>
       ) : (
         <div className="day-details-list">
           {displayTasks.length > 0 ? (
-            displayTasks.map((task) => (
-              <div
-                key={task.id}
-                className={`item ${task.checked ? "done" : ""} ${
-                  task.isArchived ? "archived" : ""
-                }`}
-              >
-                <div className="item-content">
-                  <label className="title">
-                    <input
-                      type="checkbox"
-                      checked={task.checked}
-                      disabled={!isAuthenticated || task.isArchived}
-                      onChange={(e) =>
-                        mToggleCheck.mutate({
-                          id: task.id.startsWith("placeholder-")
-                            ? undefined
-                            : task.id,
-                          templateId: task.templateId ?? undefined,
-                          checked: e.target.checked,
-                          dateYMD: selectedDate,
-                        })
-                      }
-                    />
-                    <span>{task.title}</span>
-                  </label>
-                  {(task.note || task.value !== null) && (
-                    <div className="note">
-                      {task.value !== null && (
-                        <span className="task-value">[{task.value}시간] </span>
-                      )}
-                      {task.enableNote && task.note && `“${task.note}”`}
-                    </div>
-                  )}
+            <>
+              {routineTasks.length > 0 && (
+                <div className="task-group">
+                  <h4 className="task-group-title">고정 루틴</h4>
+                  {routineTasks.map((task) => (
+                    <TaskItem key={task.id} task={task} />
+                  ))}
                 </div>
-                {task.enableNote && !task.isOneOff && (
-                  <button
-                    className="btn-memo"
-                    disabled={!isAuthenticated || task.isArchived}
-                    aria-label="메모"
-                    onClick={() =>
-                      onSetMemoTarget({
-                        kind: "template",
-                        templateId: task.templateId!,
-                        title: task.title,
-                        note: task.note,
-                      })
-                    }
-                  >
-                    📝
-                  </button>
-                )}
-              </div>
-            ))
+              )}
+              {oneOffTasks.length > 0 && (
+                <div className="task-group">
+                  <h4 className="task-group-title">오늘의 할 일</h4>
+                  {oneOffTasks.map((task) => (
+                    <TaskItem key={task.id} task={task} />
+                  ))}
+                </div>
+              )}
+            </>
           ) : (
-            <p style={{ textAlign: "center", color: "var(--muted)" }}>
+            <p className="placeholder-text">
               이 날짜에 해당하는 루틴이 없습니다.
             </p>
           )}
@@ -211,31 +294,31 @@ function CalendarContent({ isAuthenticated }: { isAuthenticated: boolean }) {
   const api = useApi();
   const [focus, setFocus] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [showPercentage, setShowPercentage] = useState(false); // 달성률 표시 상태
+  const [showPercentage, setShowPercentage] = useState(false);
   const [memoTarget, setMemoTarget] = useState<MemoTarget | null>(null);
 
   const from = localYMD(firstOfMonth(focus));
   const to = localYMD(lastOfMonth(focus));
 
-  // 1. 모든 템플릿 정보를 가져옵니다.
   const { data: allTemplates = [], isLoading: isLoadingTemplates } = useQuery({
     queryKey: ["templates", "all"],
     queryFn: api.getAllTemplates,
     enabled: isAuthenticated,
   });
 
-  // 2. 현재 달의 모든 태스크 기록을 가져옵니다.
   const { data: monthTasks = [], isLoading: isLoadingMonthTasks } = useQuery({
     queryKey: ["tasks", "range", from, to],
     queryFn: () => api.getTasksForRange(from, to),
     enabled: isAuthenticated,
   });
 
-  // 3. 프론트엔드에서 직접 달성률 요약 맵을 계산합니다.
+  const tasksForSelectedDate = useMemo(() => {
+    if (!selectedDate) return [];
+    return monthTasks.filter((task) => task.dateYMD === selectedDate);
+  }, [selectedDate, monthTasks]);
+
   const summaryMap = useMemo(() => {
-    if (!isAuthenticated || !allTemplates.length) {
-      return {};
-    }
+    if (!isAuthenticated || !allTemplates.length) return {};
 
     const summaries: Record<
       string,
@@ -259,8 +342,6 @@ function CalendarContent({ isAuthenticated }: { isAuthenticated: boolean }) {
 
     for (const dateYMD of daysInMonth) {
       const tasksOnDate = tasksByDate[dateYMD] || [];
-
-      // 그날 당시에 활성화 상태였던 템플릿을 필터링합니다.
       const defaultActiveTemplatesOnDate = allTemplates.filter((tpl) => {
         if (!tpl.defaultActive) return false;
         const createdAtDate = tpl.createdAt.substring(0, 10);
@@ -272,7 +353,6 @@ function CalendarContent({ isAuthenticated }: { isAuthenticated: boolean }) {
         return true;
       });
 
-      // 그날 실제 기록이 있는 템플릿을 찾습니다.
       const templateIdsWithTasks = new Set(
         tasksOnDate.map((t) => t.templateId).filter(Boolean) as string[]
       );
@@ -280,7 +360,6 @@ function CalendarContent({ isAuthenticated }: { isAuthenticated: boolean }) {
         templateIdsWithTasks.has(tpl.id)
       );
 
-      // 두 목록을 합쳐 중복을 제거하여 그날의 총 루틴 목록을 만듭니다.
       const allRelevantTemplates = new Map<string, Template>();
       defaultActiveTemplatesOnDate.forEach((tpl) =>
         allRelevantTemplates.set(tpl.id, tpl)
@@ -290,12 +369,10 @@ function CalendarContent({ isAuthenticated }: { isAuthenticated: boolean }) {
       );
 
       const relevantTemplatesArray = Array.from(allRelevantTemplates.values());
-
       const activeTemplatesTotalWeight = relevantTemplatesArray.reduce(
         (sum, tpl) => sum + tpl.weight,
         0
       );
-
       const oneOffTasksTotalWeight = tasksOnDate
         .filter((t) => t.isOneOff)
         .reduce((sum, t) => sum + t.weight, 0);
@@ -346,7 +423,6 @@ function CalendarContent({ isAuthenticated }: { isAuthenticated: boolean }) {
   };
 
   const todayYMD = localYMD();
-
   const isLoading =
     isAuthenticated && (isLoadingTemplates || isLoadingMonthTasks);
 
@@ -449,6 +525,8 @@ function CalendarContent({ isAuthenticated }: { isAuthenticated: boolean }) {
             onSetMemoTarget={setMemoTarget}
             isAuthenticated={isAuthenticated}
             allTemplates={allTemplates}
+            tasks={tasksForSelectedDate}
+            isLoading={isLoadingMonthTasks}
           />
         ) : (
           <div className="sidebar-placeholder">
@@ -468,10 +546,6 @@ function CalendarContent({ isAuthenticated }: { isAuthenticated: boolean }) {
   );
 }
 
-/**
- * 인증 상태 로딩을 처리하는 Wrapper 컴포넌트입니다.
- * isAuthLoading이 true이면 로딩 화면을, false이면 실제 컨텐츠를 렌더링합니다.
- */
 export default function Calendar() {
   const { isAuthenticated, isAuthLoading } = useAuth();
 
