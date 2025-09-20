@@ -1,6 +1,7 @@
 // e:/pleaseCheckYourDays/backend/src/index.ts
 import app from "./app.js";
 import dotenv from "dotenv";
+import { config } from "./config/index.js";
 
 dotenv.config();
 
@@ -25,5 +26,6 @@ if (isNaN(PORT)) {
 }
 
 app.listen(PORT, HOST, () => {
+  console.log(`✅ Environment: ${config.NODE_ENV}`);
   console.log(`🚀 Server is listening on ${HOST}:${PORT}`);
 });

@@ -16,10 +16,18 @@ const app = express();
 // 1. Set various security HTTP headers
 app.use(helmet());
 
+const allowedOrigins = [
+  "http://localhost:5173", // 로컬 프론트엔드 개발 서버
+];
+
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 // 2. Configure CORS for production to allow credentials
 const corsOptions = {
-  // 설정이 없으면 로컬 개발 환경을 기본값으로 사용합니다.
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  // 개발 및 프로덕션 환경의 출처를 모두 허용합니다.
+  origin: allowedOrigins,
   credentials: true, // HttpOnly 쿠키를 주고받기 위해 필수
 };
 app.use(cors(corsOptions));
@@ -40,6 +48,9 @@ app.use(express.json());
 app.use(cookieParser()); // Add cookie-parser to handle HttpOnly cookies
 app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
+
+// Nginx 같은 리버스 프록시 뒤에서 실행될 때, Express가 클라이언트 IP와 프로토콜을 신뢰하도록 설정합니다.
+app.set("trust proxy", 1);
 
 // API Routes - 모든 API 경로는 /api 접두사를 갖습니다.
 app.use("/api", apiRoutes);
