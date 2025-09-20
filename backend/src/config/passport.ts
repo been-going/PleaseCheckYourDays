@@ -3,6 +3,7 @@ import { Strategy as JwtStrategy, ExtractJwt } from "passport-jwt";
 import { Request } from "express";
 import passport from "passport";
 import prisma from "../lib/prisma.js";
+import { config } from "./index.js";
 
 const cookieExtractor = (req: Request) => {
   let token = null;
@@ -12,22 +13,13 @@ const cookieExtractor = (req: Request) => {
   return token;
 };
 
-const jwtSecret = process.env.JWT_SECRET;
-// 환경 변수에 JWT_SECRET이 설정되지 않은 경우, 보안을 위해 서버 실행을 중단합니다.
-if (!jwtSecret) {
-  console.error(
-    "Fatal Error: JWT_SECRET is not defined in environment variables."
-  );
-  process.exit(1);
-}
-
 const opts = {
   // 1순위: 쿠키, 2순위: Authorization 헤더에서 토큰을 찾습니다.
   jwtFromRequest: ExtractJwt.fromExtractors([
     cookieExtractor,
     ExtractJwt.fromAuthHeaderAsBearerToken(),
   ]),
-  secretOrKey: jwtSecret,
+  secretOrKey: config.JWT_SECRET,
 };
 
 passport.use(

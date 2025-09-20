@@ -36,8 +36,21 @@ export const updateTask = async (
   return prisma.dailyTask.findUniqueOrThrow({ where: { id } });
 };
 
-export const deleteTask = (id: string, userId: string) =>
-  prisma.dailyTask.delete({ where: { id, userId } });
+export const deleteTask = async (id: string, userId: string) => {
+  // deleteMany를 사용하여 id와 userId를 모두 검사하여 안전하게 삭제합니다.
+  const result = await prisma.dailyTask.deleteMany({
+    where: { id, userId },
+  });
+
+  // 삭제된 레코드가 없으면 권한이 없거나 존재하지 않는 작업이므로 에러를 발생시킵니다.
+  if (result.count === 0) {
+    const error = new Error(
+      "Task not found or you do not have permission."
+    ) as any;
+    error.statusCode = 404;
+    throw error;
+  }
+};
 
 export const upsertTaskFromTemplate = async (
   userId: string,

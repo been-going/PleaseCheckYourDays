@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { Prisma } from "@prisma/client";
 import prisma from "../lib/prisma.js";
+import { config } from "../config/index.js";
 
 export const signupUser = async (userData: Prisma.UserCreateInput) => {
   const { email, password } = userData;
@@ -45,10 +46,8 @@ export const loginUser = async (
 
   const token = jwt.sign(
     { id: user.id, email: user.email },
-    process.env.JWT_SECRET!,
-    {
-      expiresIn: "7d",
-    }
+    config.JWT_SECRET,
+    { expiresIn: "7d" }
   );
 
   return token;
