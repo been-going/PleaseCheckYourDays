@@ -3,13 +3,20 @@ import passport from "passport";
 import { JwtPayload } from "jsonwebtoken";
 import prisma from "./prisma.js";
 
-console.log("[Passport] Loading JWT Secret from env:", process.env.JWT_SECRET);
+// console.log("[Passport] Loading JWT Secret from env:", process.env.JWT_SECRET);
 
-const secret = process.env.JWT_SECRET || "your_jwt_secret";
+const jwtSecret = process.env.JWT_SECRET;
+// 환경 변수에 JWT_SECRET이 설정되지 않은 경우, 보안을 위해 서버 실행을 중단합니다.
+if (!jwtSecret) {
+  console.error(
+    "Fatal Error: JWT_SECRET is not defined in environment variables."
+  );
+  process.exit(1);
+}
 
 const opts = {
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  secretOrKey: secret,
+  secretOrKey: jwtSecret,
 };
 
 console.log("[Passport] Strategy options set with secret.");
