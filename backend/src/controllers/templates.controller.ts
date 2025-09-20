@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as templatesService from "../services/templates.service";
+import * as templatesService from "../services/templates.service.js";
 
 const getUserId = (req: Request): string => (req.user as { id: string }).id;
 

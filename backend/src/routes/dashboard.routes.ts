@@ -1,8 +1,8 @@
 // e:/pleaseCheckYourDays/backend/src/routes/dashboard.routes.ts
 import { Router } from "express";
-import { getRoutineStats } from "../controllers/dashboard.controller";
-import { asyncHandler } from "../utils/asyncHandler";
-import { protect } from "../middleware/auth.middleware";
+import { getRoutineStats } from "../controllers/dashboard.controller.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { protect } from "../middleware/auth.middleware.js";
 
 const router = Router();
 

@@ -1,7 +1,7 @@
 import { Router } from "express";
-import * as fixedCostsController from "../controllers/fixedCosts.controller";
-import { asyncHandler } from "../utils/asyncHandler";
-import { protect } from "../middleware/auth.middleware";
+import * as fixedCostsController from "../controllers/fixedCosts.controller.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { protect } from "../middleware/auth.middleware.js";
 
 const router = Router();
 router.use(protect);

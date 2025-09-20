@@ -1,5 +1,5 @@
 // e:/pleaseCheckYourDays/backend/src/services/dashboard.service.ts
-import prisma from "../lib/prisma";
+import prisma from "../lib/prisma.js";
 
 type RoutineStat = {
   id: string;

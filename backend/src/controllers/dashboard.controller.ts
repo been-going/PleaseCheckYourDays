@@ -1,6 +1,6 @@
 // e:/pleaseCheckYourDays/backend/src/controllers/dashboard.controller.ts
 import { Request, Response } from "express";
-import * as dashboardService from "../services/dashboard.service";
+import * as dashboardService from "../services/dashboard.service.js";
 
 export const getRoutineStats = async (req: Request, res: Response) => {
   // req.user는 protect 미들웨어에서 설정해줍니다.

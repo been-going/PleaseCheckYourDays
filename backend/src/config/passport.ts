@@ -2,7 +2,7 @@
 import { Strategy as JwtStrategy, ExtractJwt } from "passport-jwt";
 import { Request } from "express";
 import passport from "passport";
-import prisma from "../lib/prisma";
+import prisma from "../lib/prisma.js";
 
 const cookieExtractor = (req: Request) => {
   let token = null;

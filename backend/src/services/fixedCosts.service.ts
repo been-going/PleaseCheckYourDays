@@ -1,5 +1,5 @@
 // e:/pleaseCheckYourDays/backend/src/services/fixedCosts.service.ts
-import prisma from "../lib/prisma";
+import prisma from "../lib/prisma.js";
 import { FixedCost } from "@prisma/client";
 
 export const getFixedCosts = (userId: string) =>

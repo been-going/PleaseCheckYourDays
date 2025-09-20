@@ -1,7 +1,7 @@
 import { Router } from "express";
-import * as templatesController from "../controllers/templates.controller";
-import { asyncHandler } from "../utils/asyncHandler";
-import { protect } from "../middleware/auth.middleware";
+import * as templatesController from "../controllers/templates.controller.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { protect } from "../middleware/auth.middleware.js";
 
 const router = Router();
 router.use(protect);

@@ -1,6 +1,6 @@
 import express from "express";
 import { User } from "@prisma/client"; // Re-import User type
-import prisma from "../lib/prisma";
+import prisma from "../lib/prisma.js";
 
 const router = express.Router();
 

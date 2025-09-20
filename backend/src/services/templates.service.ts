@@ -1,5 +1,5 @@
 // e:/pleaseCheckYourDays/backend/src/services/templates.service.ts
-import prisma from "../lib/prisma";
+import prisma from "../lib/prisma.js";
 import { Template } from "@prisma/client";
 
 export const getActiveTemplates = (userId: string) =>

@@ -1,8 +1,8 @@
 // e:/pleaseCheckYourDays/backend/src/routes/tasks.routes.ts
 import { Router } from "express";
-import * as tasksController from "../controllers/tasks.controller";
-import { asyncHandler } from "../utils/asyncHandler";
-import { protect } from "../middleware/auth.middleware";
+import * as tasksController from "../controllers/tasks.controller.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { protect } from "../middleware/auth.middleware.js";
 
 const router = Router();
 router.use(protect);

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as tasksService from "../services/tasks.service";
+import * as tasksService from "../services/tasks.service.js";
 
 const getUserId = (req: Request): string => (req.user as { id: string }).id;
 

@@ -1,37 +1,43 @@
-import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
-import passport from 'passport';
-import { JwtPayload } from 'jsonwebtoken';
-import prisma from './prisma';
+import { Strategy as JwtStrategy, ExtractJwt } from "passport-jwt";
+import passport from "passport";
+import { JwtPayload } from "jsonwebtoken";
+import prisma from "./prisma.js";
 
-console.log('[Passport] Loading JWT Secret from env:', process.env.JWT_SECRET);
+console.log("[Passport] Loading JWT Secret from env:", process.env.JWT_SECRET);
 
-const secret = process.env.JWT_SECRET || 'your_jwt_secret';
+const secret = process.env.JWT_SECRET || "your_jwt_secret";
 
 const opts = {
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
   secretOrKey: secret,
 };
 
-console.log('[Passport] Strategy options set with secret.');
+console.log("[Passport] Strategy options set with secret.");
 
 passport.use(
-  new JwtStrategy(opts, async (jwt_payload: JwtPayload, done: (err: any, user?: Express.User | false, info?: any) => void) => {
-    console.log('[Passport] JWT Payload Received:', jwt_payload);
-    try {
-      const user = await prisma.user.findUnique({
-        where: { id: jwt_payload.id },
-      });
-      if (user) {
-        console.log('[Passport] User found in DB:', user.email);
-        return done(null, user);
+  new JwtStrategy(
+    opts,
+    async (
+      jwt_payload: JwtPayload,
+      done: (err: any, user?: Express.User | false, info?: any) => void
+    ) => {
+      console.log("[Passport] JWT Payload Received:", jwt_payload);
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: jwt_payload.id },
+        });
+        if (user) {
+          console.log("[Passport] User found in DB:", user.email);
+          return done(null, user);
+        }
+        console.log("[Passport] User NOT found in DB for id:", jwt_payload.id);
+        return done(null, false);
+      } catch (err) {
+        console.error("[Passport] Error during user lookup:", err);
+        return done(err, false);
       }
-      console.log('[Passport] User NOT found in DB for id:', jwt_payload.id);
-      return done(null, false);
-    } catch (err) {
-      console.error('[Passport] Error during user lookup:', err);
-      return done(err, false);
     }
-  })
+  )
 );
 
 export default passport;

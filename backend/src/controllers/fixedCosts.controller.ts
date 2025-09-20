@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as fixedCostsService from "../services/fixedCosts.service";
+import * as fixedCostsService from "../services/fixedCosts.service.js";
 
 const getUserId = (req: Request): string => (req.user as { id: string }).id;
 

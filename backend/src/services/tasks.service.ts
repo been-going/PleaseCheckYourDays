@@ -1,5 +1,5 @@
 // e:/pleaseCheckYourDays/backend/src/services/tasks.service.ts
-import prisma from "../lib/prisma";
+import prisma from "../lib/prisma.js";
 import { DailyTask } from "@prisma/client";
 
 export const getDailyTasks = (userId: string, date: string) =>

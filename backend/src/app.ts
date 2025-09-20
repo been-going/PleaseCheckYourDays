@@ -5,9 +5,9 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import morgan from "morgan";
-import passport from "./config/passport";
-import apiRoutes from "./routes";
-import { errorHandler } from "./middleware/error.middleware";
+import passport from "./config/passport.js";
+import apiRoutes from "./routes/index.js";
+import { errorHandler } from "./middleware/error.middleware.js";
 
 const app = express();
 

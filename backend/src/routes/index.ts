@@ -1,11 +1,11 @@
 // e:/pleaseCheckYourDays/backend/src/routes/index.ts
 import { Router } from "express";
-import dashboardRoutes from "./dashboard.routes";
-import authRoutes from "./auth.routes"; // 이제 새로 만든 올바른 파일을 참조합니다.
-import taskRoutes from "./tasks.routes";
-import templateRoutes from "./templates.routes";
-import fixedCostsRoutes from "./fixedCosts.routes";
-import dailyRoutes from "./daily.routes";
+import dashboardRoutes from "./dashboard.routes.js";
+import authRoutes from "./auth.routes.js"; // 이제 새로 만든 올바른 파일을 참조합니다.
+import taskRoutes from "./tasks.routes.js";
+import templateRoutes from "./templates.routes.js";
+import fixedCostsRoutes from "./fixedCosts.routes.js";
+import dailyRoutes from "./daily.routes.js";
 
 const router = Router();
 
