@@ -11,7 +11,7 @@ export const reorderTemplatesSchema = z.object({
   body: z.object({
     updates: z.array(
       z.object({
-        id: z.string().uuid(),
+        id: z.string().min(1, "ID는 필수입니다."),
         order: z.number().int(),
       })
     ),
@@ -20,7 +20,7 @@ export const reorderTemplatesSchema = z.object({
 
 export const updateTemplateSchema = z.object({
   params: z.object({
-    id: z.string().uuid(),
+    id: z.string().min(1, "ID는 필수입니다."),
   }),
   body: z.object({
     title: z.string().min(1).max(100).optional(),
@@ -31,6 +31,6 @@ export const updateTemplateSchema = z.object({
 
 export const templateIdParamSchema = z.object({
   params: z.object({
-    id: z.string().uuid(),
+    id: z.string().min(1, "ID는 필수입니다."),
   }),
 });

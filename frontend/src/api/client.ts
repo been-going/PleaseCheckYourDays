@@ -50,7 +50,7 @@ export interface DailyTask {
 export async function getDailyTasks(
   date: string // YYYY-MM-DD
 ): Promise<{ tasks: DailyTask[] }> {
-  const { data } = await axiosInstance.get(`/daily/tasks?date=${date}`);
+  const { data } = await axiosInstance.get(`/tasks?date=${date}`);
   return data;
 }
 
@@ -59,7 +59,7 @@ export async function getTasksForRange(
   to: string
 ): Promise<DailyTask[]> {
   const { data } = await axiosInstance.get(
-    `/daily/tasks/range?from=${from}&to=${to}`
+    `/tasks/range?from=${from}&to=${to}`
   );
   return data;
 }
@@ -259,7 +259,7 @@ export async function addOneoff(data: {
   dateYMD: string;
 }): Promise<DailyTask> {
   const { data: responseData } = await axiosInstance.post(
-    "/daily/tasks/oneoff",
+    "/tasks/oneoff",
     data
   );
   return responseData;

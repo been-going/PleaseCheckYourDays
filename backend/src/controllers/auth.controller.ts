@@ -14,9 +14,12 @@ export const login = async (req: Request, res: Response) => {
   const token = await authService.loginUser({ email, password });
 
   res.cookie("jwt", token, {
-    httpOnly: true, // JavaScript에서 접근 불가하여 XSS 공격에 안전
-    secure: process.env.NODE_ENV === "production", // 프로덕션에서는 HTTPS에서만 전송
-    sameSite: "strict", // CSRF 공격 방어
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    // Vercel(프론트엔드)과 EC2(백엔드)는 다른 도메인이므로, 쿠키를 전송하려면 'none'으로 설정해야 합니다.
+    // 'none'으로 설정 시 'secure: true'가 반드시 필요하며, 이는 백엔드가 HTTPS로 서비스되어야 함을 의미합니다.
+    // 개발 환경에서는 'lax'를 사용합니다.
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7일 유효기간
   });
 

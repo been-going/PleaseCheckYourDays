@@ -18,7 +18,7 @@ app.use(helmet());
 
 // 2. Configure CORS for production to allow credentials
 const corsOptions = {
-  // 실제 프로덕션 환경의 프론트엔드 URL로 교체해야 합니다.
+  // 설정이 없으면 로컬 개발 환경을 기본값으로 사용합니다.
   origin: process.env.FRONTEND_URL || "http://localhost:5173",
   credentials: true, // HttpOnly 쿠키를 주고받기 위해 필수
 };
@@ -41,8 +41,8 @@ app.use(cookieParser()); // Add cookie-parser to handle HttpOnly cookies
 app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
 
-// API Routes - '/api' 접두사 없이 직접 라우트를 사용합니다.
-app.use("/", apiRoutes);
+// API Routes - 모든 API 경로는 /api 접두사를 갖습니다.
+app.use("/api", apiRoutes);
 
 // Health check endpoint
 app.get("/health", (req, res) => {

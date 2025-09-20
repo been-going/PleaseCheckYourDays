@@ -14,6 +14,6 @@ export const addFixedCostSchema = z.object({
 
 export const deleteFixedCostSchema = z.object({
   params: z.object({
-    id: z.string().uuid("유효한 ID 형식이 아닙니다."),
+    id: z.string().min(1, "ID는 필수입니다."),
   }),
 });
