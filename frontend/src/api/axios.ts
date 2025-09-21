@@ -1,13 +1,8 @@
 import axios from "axios";
 
-// Vercel에 설정된 VITE_API_URL에서 마지막 '/'가 있을 경우 제거합니다.
-// 예: "http://.../" -> "http://..."
-const prodUrl = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
-
-// 환경에 따라 baseURL을 다르게 설정합니다.
-// 1. 프로덕션 환경(Vercel): Vercel에 설정된 환경 변수 + /api
-// 2. 개발 환경: Vite 프록시를 사용하기 위해 상대 경로인 /api로 설정
-const baseURL = import.meta.env.PROD ? `${prodUrl}/api` : "/api";
+// 개발(Vite 프록시) 및 프로덕션(Vercel 프록시) 환경 모두에서
+// 상대 경로 '/api'를 사용하도록 baseURL을 고정합니다.
+const baseURL = "/api";
 
 // 앱 전체에서 사용할 단일 axios 인스턴스 생성
 const axiosInstance = axios.create({
