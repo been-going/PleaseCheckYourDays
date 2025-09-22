@@ -2,6 +2,7 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api";
 import type { Template } from "../api/client";
+import { getErrorMessage } from "../utils/errorUtils";
 import "./Modal.css";
 
 interface TrashModalProps {
@@ -56,15 +57,15 @@ const TrashModal: React.FC<TrashModalProps> = ({ isOpen, onClose }) => {
           {isLoading ? (
             <p>로딩 중...</p>
           ) : error ? (
-            <p className="error-message">오류: {(error as Error).message}</p>
+            <p className="error-message">오류: {getErrorMessage(error)}</p>
           ) : !trashedItems || trashedItems.length === 0 ? (
-            <p>휴지통이 비어있습니다.</p>
+            <p className="placeholder-text">휴지통이 비어있습니다.</p>
           ) : (
-            <ul className="trash-list">
+            <div className="list">
               {trashedItems.map((item: Template) => (
-                <li key={item.id} className="trash-item">
-                  <span className="trash-item-title">{item.title}</span>
-                  <div className="trash-item-actions">
+                <div key={item.id} className="item">
+                  <span className="title">{item.title}</span>
+                  <div className="row">
                     <button
                       className="btn"
                       onClick={() => mRestore.mutate(item.id)}
@@ -76,7 +77,7 @@ const TrashModal: React.FC<TrashModalProps> = ({ isOpen, onClose }) => {
                       className="btn danger"
                       onClick={() => {
                         if (
-                          window.confirm(
+                          confirm(
                             `'${item.title}' 루틴을 영구적으로 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`
                           )
                         ) {
@@ -88,9 +89,9 @@ const TrashModal: React.FC<TrashModalProps> = ({ isOpen, onClose }) => {
                       영구 삭제
                     </button>
                   </div>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </div>
         <div className="modal-footer">

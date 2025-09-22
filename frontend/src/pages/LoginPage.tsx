@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api";
 import { useNavigate, Link } from "react-router-dom";
+import { getErrorMessage } from "../utils/errorUtils";
 import "./Auth.css";
 
 export default function LoginPage() {
@@ -30,10 +31,7 @@ export default function LoginPage() {
       <h2>로그인</h2>
       <form onSubmit={handleSubmit} className="auth-form">
         {mLogin.error && (
-          <p className="auth-error">
-            {(mLogin.error as any)?.response?.data?.message ||
-              (mLogin.error as Error).message}
-          </p>
+          <p className="auth-error">{getErrorMessage(mLogin.error)}</p>
         )}
         <div className="form-group">
           <label htmlFor="email">이메일</label>

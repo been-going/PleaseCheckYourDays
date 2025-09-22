@@ -21,6 +21,7 @@ import { useApi } from "../api";
 import { useAuth } from "../context/AuthContext";
 import type { Template, DailyTask as Task } from "../api/client";
 import { getStyleForPercentage } from "../utils/colorUtils";
+import { getErrorMessage } from "../utils/errorUtils";
 import { localYMD } from "../utils/dateUtils";
 import { MemoModal } from "../components/MemoModal";
 import TrashModal from "../components/TrashModal";
@@ -196,7 +197,7 @@ function TodayUnauthenticatedPreview() {
         </Link>
       </div>
       <div
-        className="grid today-grid"
+        className="today-layout" // This class is now a simple flex column
         style={{
           filter: "grayscale(80%)",
           opacity: 0.7,
@@ -260,8 +261,9 @@ function TodayCombinedContent({
     qc.invalidateQueries({ queryKey: ["tasks", dateYMD] });
 
   const onMutationError = (error: unknown) => {
+    const message = getErrorMessage(error);
     console.error("Mutation failed:", error);
-    alert("작업에 실패했습니다. 개발자 콘솔을 확인해주세요.");
+    alert(message);
   };
 
   const mUpdateTask = useMutation({
@@ -331,7 +333,7 @@ function TodayCombinedContent({
   }
 
   return (
-    <div className="grid today-grid">
+    <div className="today-layout">
       <TodaySummaryCard
         isAuthenticated={isAuthenticated}
         templates={templates}
@@ -353,6 +355,7 @@ function TodayCombinedContent({
         isAuthenticated={isAuthenticated}
         onOpenTrash={() => setIsTrashModalOpen(true)}
       />
+
       <MemoModal
         isOpen={!!memoTarget}
         targetTitle={memoTarget?.title ?? ""}

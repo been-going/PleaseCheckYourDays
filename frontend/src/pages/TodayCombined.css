@@ -1,14 +1,18 @@
 /* src/pages/TodayCombined.css */
 
-.today-grid {
-  gap: 1rem;
+.today-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
+/* --- Common styles for cards on this page --- */
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .card-header h3 {
@@ -133,6 +137,8 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .drag-handle {
