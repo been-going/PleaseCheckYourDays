@@ -7,8 +7,10 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+  DragOverlay,
 } from "@dnd-kit/core";
-import type { DragEndEvent } from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
@@ -620,6 +622,54 @@ const OneOffTasksCard = memo(function OneOffTasksCard({
   );
 });
 
+// Non-interactive item for DragOverlay
+const RoutineItem = ({
+  tpl,
+  byTplId,
+}: {
+  tpl: Template;
+  byTplId: Record<string, Task>;
+}) => {
+  const today = byTplId[tpl.id];
+  const success = today?.checked === true;
+  return (
+    <div
+      className={`item ${success ? "done" : ""}`}
+      style={{ background: "var(--bg-hover)" }}
+    >
+      <div className="item-content">
+        <label className="item-title">
+          <input type="checkbox" checked={success} readOnly />
+          <span>{tpl.title}</span>
+        </label>
+        {today &&
+          ((tpl.enableNote && today.note) ||
+            (tpl.enableValue && today.value !== null)) && (
+            <div className="item-note">
+              {tpl.enableValue && today.value !== null && (
+                <span className="task-value">[{today.value}시간] </span>
+              )}
+              {tpl.enableNote && today.note && `“${today.note}”`}
+            </div>
+          )}
+      </div>
+      <div className="item-actions" style={{ visibility: "hidden" }}>
+        {/* Placeholder for layout */}
+        <div className="value-input-wrapper">
+          <input type="number" className="value-input" readOnly />
+          <span className="value-input-unit">시간</span>
+        </div>
+        <button type="button" className="btn">
+          메모
+        </button>
+        <details className="menu">
+          <summary className="btn">⋯</summary>
+        </details>
+      </div>
+    </div>
+  );
+};
+
 const SortableRoutineItem = ({
   tpl,
   children,
@@ -639,7 +689,7 @@ const SortableRoutineItem = ({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0 : 1, // Hide original item while dragging
     display: "flex",
     alignItems: "center",
     gap: "8px",
@@ -679,6 +729,32 @@ const RoutineTemplatesCard = memo(function RoutineTemplatesCard({
   const qc = useQueryClient();
   const api = useApi();
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
+  const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
+
+  const [groupedTemplates, setGroupedTemplates] = useState<
+    Record<Group, Template[]>
+  >({
+    MORNING: [],
+    EXECUTE: [],
+    EVENING: [],
+  });
+
+  useEffect(() => {
+    const groups: Record<Group, Template[]> = {
+      MORNING: [],
+      EXECUTE: [],
+      EVENING: [],
+    };
+    const sortedTemplates = [...templates].sort(
+      (a, b) => (a.order ?? 0) - (b.order ?? 0)
+    );
+    for (const tpl of sortedTemplates) {
+      if (groups[tpl.group]) {
+        groups[tpl.group]!.push(tpl);
+      }
+    }
+    setGroupedTemplates(groups);
+  }, [templates]);
 
   useEffect(() => {
     const handleGlobalClick = (event: MouseEvent) => {
@@ -695,23 +771,18 @@ const RoutineTemplatesCard = memo(function RoutineTemplatesCard({
     return () => document.removeEventListener("click", handleGlobalClick);
   }, []);
 
-  const [internalTemplates, setInternalTemplates] = useState<Template[]>([]);
-  useEffect(() => {
-    setInternalTemplates(
-      [...templates].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    );
-  }, [templates]);
-
   useEffect(() => {
     const initialValues: Record<string, string> = {};
-    internalTemplates.forEach((tpl) => {
-      const today = byTplId[tpl.id];
-      if (today) {
-        initialValues[tpl.id] = today.value?.toString() ?? "";
-      }
-    });
+    Object.values(groupedTemplates)
+      .flat()
+      .forEach((tpl) => {
+        const today = byTplId[tpl.id];
+        if (today) {
+          initialValues[tpl.id] = today.value?.toString() ?? "";
+        }
+      });
     setInputValues(initialValues);
-  }, [internalTemplates, byTplId]);
+  }, [groupedTemplates, byTplId]);
 
   const invalidateTemplates = () =>
     qc.invalidateQueries({ queryKey: ["templates"] });
@@ -744,14 +815,16 @@ const RoutineTemplatesCard = memo(function RoutineTemplatesCard({
   });
 
   const mReorderTemplates = useMutation({
-    mutationFn: (p: { updates: { id: string; order: number }[] }) =>
-      api.reorderTemplates(p.updates),
+    mutationFn: (p: {
+      updates: { id: string; order: number; group: Group }[];
+    }) => api.reorderTemplates(p.updates),
     onSuccess: invalidateTemplates,
     onError: () => {
       alert("순서 변경에 실패했습니다. 페이지를 새로고침합니다.");
       window.location.reload();
     },
   });
+
   const mUpdateTask = useMutation({
     mutationFn: (p: {
       id: string;
@@ -803,53 +876,88 @@ const RoutineTemplatesCard = memo(function RoutineTemplatesCard({
     onSuccess: invalidateToday,
   });
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-
-    if (over && active.id !== over.id) {
-      const oldIndex = internalTemplates.findIndex((t) => t.id === active.id);
-      const newIndex = internalTemplates.findIndex((t) => t.id === over.id);
-
-      const activeTemplate = internalTemplates[oldIndex];
-      const overTemplate = internalTemplates[newIndex];
-
-      if (activeTemplate.group !== overTemplate.group) {
-        return;
-      }
-
-      const reorderedTemplates = arrayMove(
-        internalTemplates,
-        oldIndex,
-        newIndex
-      );
-      setInternalTemplates(reorderedTemplates);
-
-      const groupToUpdate = activeTemplate.group;
-      const updatesForBackend = reorderedTemplates
-        .filter((t) => t.group === groupToUpdate)
-        .map((template, index) => ({
-          id: template.id,
-          order: index,
-        }));
-
-      mReorderTemplates.mutate({ updates: updatesForBackend });
+  function findContainer(id: string): Group | undefined {
+    if (id in groupedTemplates) {
+      return id as Group;
     }
+    return (Object.keys(groupedTemplates) as Group[]).find((key) =>
+      groupedTemplates[key].some((item) => item.id === id)
+    );
   }
 
-  const groupedTemplates = useMemo(() => {
-    const groups: { [key in Group]?: Template[] } = {
-      MORNING: [],
-      EXECUTE: [],
-      EVENING: [],
-    };
-    const sorted = [...internalTemplates].sort(
-      (a, b) => (a.order ?? 0) - (b.order ?? 0)
-    );
-    for (const tpl of sorted) {
-      if (groups[tpl.group]) groups[tpl.group]!.push(tpl);
+  function handleDragStart(event: DragStartEvent) {
+    const { active } = event;
+    const id = String(active.id);
+    const allTemplates = Object.values(groupedTemplates).flat();
+    setActiveTemplate(allTemplates.find((t) => t.id === id) || null);
+  }
+
+  function handleDragCancel() {
+    setActiveTemplate(null);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    setActiveTemplate(null);
+
+    if (!over) {
+      return;
     }
-    return groups;
-  }, [internalTemplates]);
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    const activeContainer = findContainer(activeId);
+    const overContainer = findContainer(overId);
+
+    if (!activeContainer || !overContainer || activeId === overId) {
+      return;
+    }
+
+    const newGroupedTemplates = { ...groupedTemplates };
+    let finalGroupedTemplates;
+
+    if (activeContainer === overContainer) {
+      const items = newGroupedTemplates[activeContainer];
+      const oldIndex = items.findIndex((item) => item.id === activeId);
+      const newIndex = items.findIndex((item) => item.id === overId);
+      if (oldIndex !== newIndex) {
+        newGroupedTemplates[activeContainer] = arrayMove(
+          items,
+          oldIndex,
+          newIndex
+        );
+      }
+      finalGroupedTemplates = newGroupedTemplates;
+    } else {
+      const activeItems = newGroupedTemplates[activeContainer];
+      const overItems = newGroupedTemplates[overContainer];
+      const activeIndex = activeItems.findIndex((item) => item.id === activeId);
+      let overIndex = overItems.findIndex((item) => item.id === overId);
+      if (overIndex === -1) {
+        overIndex = overItems.length;
+      }
+
+      const [movedItem] = activeItems.splice(activeIndex, 1);
+      overItems.splice(overIndex, 0, movedItem);
+      finalGroupedTemplates = newGroupedTemplates;
+    }
+
+    setGroupedTemplates(finalGroupedTemplates);
+
+    const updates: { id: string; order: number; group: Group }[] = [];
+    (Object.keys(finalGroupedTemplates) as Group[]).forEach((group) => {
+      finalGroupedTemplates[group].forEach((template, index) => {
+        updates.push({
+          id: template.id,
+          order: index,
+          group: group,
+        });
+      });
+    });
+
+    mReorderTemplates.mutate({ updates });
+  }
 
   const [newTplTitle, setNewTplTitle] = useState("");
   const [newTplGroup, setNewTplGroup] = useState<Group>("EXECUTE");
@@ -917,201 +1025,207 @@ const RoutineTemplatesCard = memo(function RoutineTemplatesCard({
         </div>
       </div>
       <div className="section">
-        {(Object.keys(groupedTemplates) as Group[]).map((group) => {
-          const groupTemplates = groupedTemplates[group];
-          if (!groupTemplates || groupTemplates.length === 0) return null;
-          return (
-            <DndContext
-              key={group}
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
+          {(Object.keys(groupedTemplates) as Group[]).map((group) => (
+            <div className="routine-group" key={group}>
+              <h4 className="routine-group-title">{label(group)}</h4>
               <SortableContext
-                items={groupTemplates}
+                id={group}
+                items={groupedTemplates[group].map((t) => t.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="routine-group">
-                  <h4 className="routine-group-title">{label(group)}</h4>
-                  <div className="list">
-                    {groupTemplates.map((tpl) => {
-                      const today = byTplId[tpl.id];
-                      const success = today?.checked === true;
-                      return (
-                        <SortableRoutineItem tpl={tpl} key={tpl.id}>
-                          <div className={`item ${success ? "done" : ""}`}>
-                            <div className="item-content">
-                              <label className="item-title">
-                                <input
-                                  type="checkbox"
-                                  checked={success}
-                                  disabled={!isAuthenticated}
-                                  onChange={() => {
-                                    if (today) {
-                                      mUpdateTask.mutate({
-                                        id: today.id,
-                                        data: { checked: !success },
+                <div className="list">
+                  {groupedTemplates[group].map((tpl) => {
+                    const today = byTplId[tpl.id];
+                    const success = today?.checked === true;
+                    return (
+                      <SortableRoutineItem tpl={tpl} key={tpl.id}>
+                        <div className={`item ${success ? "done" : ""}`}>
+                          <div className="item-content">
+                            <label className="item-title">
+                              <input
+                                type="checkbox"
+                                checked={success}
+                                disabled={!isAuthenticated}
+                                onChange={() => {
+                                  if (today) {
+                                    mUpdateTask.mutate({
+                                      id: today.id,
+                                      data: { checked: !success },
+                                    });
+                                  } else {
+                                    mCheckTemplate.mutate({
+                                      templateId: tpl.id,
+                                      dateYMD,
+                                      checked: !success,
+                                    });
+                                  }
+                                }}
+                              />
+                              <span>{tpl.title}</span>
+                            </label>
+                            {today &&
+                              ((tpl.enableNote && today.note) ||
+                                (tpl.enableValue && today.value !== null)) && (
+                                <div className="item-note">
+                                  {tpl.enableValue && today.value !== null && (
+                                    <span className="task-value">
+                                      [{today.value}시간]{" "}
+                                    </span>
+                                  )}
+                                  {tpl.enableNote &&
+                                    today.note &&
+                                    `“${today.note}”`}
+                                </div>
+                              )}
+                          </div>
+                          <div className="item-actions">
+                            <div
+                              className="value-input-wrapper"
+                              style={{
+                                visibility: tpl.enableValue
+                                  ? "visible"
+                                  : "hidden",
+                              }}
+                            >
+                              <input
+                                type="number"
+                                className="value-input"
+                                value={inputValues[tpl.id] ?? ""}
+                                onChange={(e) =>
+                                  handleValueChange(tpl.id, e.target.value)
+                                }
+                                onBlur={() => handleValueBlur(tpl.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter")
+                                    (e.target as HTMLInputElement).blur();
+                                }}
+                                disabled={!isAuthenticated || !tpl.enableValue}
+                              />
+                              <span className="value-input-unit">시간</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn"
+                              disabled={!isAuthenticated || !tpl.enableNote}
+                              style={{
+                                visibility: tpl.enableNote
+                                  ? "visible"
+                                  : "hidden",
+                              }}
+                              onClick={() => {
+                                if (!tpl.enableNote) return;
+                                onSetMemoTarget({
+                                  kind: "template",
+                                  id: tpl.id,
+                                  title: tpl.title,
+                                  note: today?.note ?? null,
+                                });
+                              }}
+                            >
+                              메모
+                            </button>
+                            <details
+                              className="menu"
+                              {...(!isAuthenticated && {
+                                onClick: (e) => e.preventDefault(),
+                              })}
+                            >
+                              <summary
+                                className="btn"
+                                disabled={!isAuthenticated}
+                              >
+                                ⋯
+                              </summary>
+                              <div className="menu-list">
+                                <button
+                                  type="button"
+                                  className="menu-item"
+                                  onClick={() => {
+                                    const next = prompt("새 제목", tpl.title);
+                                    if (next)
+                                      mUpdateTpl.mutate({
+                                        id: tpl.id,
+                                        title: next,
                                       });
-                                    } else {
-                                      mCheckTemplate.mutate({
-                                        templateId: tpl.id,
-                                        dateYMD,
-                                        checked: !success,
-                                      });
+                                  }}
+                                >
+                                  제목 수정
+                                </button>
+                                <button
+                                  type="button"
+                                  className="menu-item"
+                                  onClick={() => {
+                                    mUpdateTplFlags.mutate({
+                                      id: tpl.id,
+                                      data: { enableNote: !tpl.enableNote },
+                                    });
+                                  }}
+                                >
+                                  {tpl.enableNote
+                                    ? "메모 작성 끄기"
+                                    : "메모 작성 켜기"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="menu-item"
+                                  onClick={() => {
+                                    mUpdateTplFlags.mutate({
+                                      id: tpl.id,
+                                      data: { enableValue: !tpl.enableValue },
+                                    });
+                                  }}
+                                >
+                                  {tpl.enableValue
+                                    ? "시간 작성 끄기"
+                                    : "시간 작성 켜기"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="menu-item"
+                                  onClick={() => {
+                                    if (
+                                      confirm(
+                                        `'${tpl.title}' 루틴을 휴지통으로 이동하시겠습니까? (기록은 유지됩니다)`
+                                      )
+                                    ) {
+                                      mDeleteTpl.mutate(tpl.id);
                                     }
                                   }}
-                                />
-                                <span>{tpl.title}</span>
-                              </label>
-                              {today &&
-                                ((tpl.enableNote && today.note) ||
-                                  (tpl.enableValue &&
-                                    today.value !== null)) && (
-                                  <div className="item-note">
-                                    {tpl.enableValue &&
-                                      today.value !== null && (
-                                        <span className="task-value">
-                                          [{today.value}시간]{" "}
-                                        </span>
-                                      )}
-                                    {tpl.enableNote &&
-                                      today.note &&
-                                      `“${today.note}”`}
-                                  </div>
-                                )}
-                            </div>
-                            <div className="item-actions">
-                              <div
-                                className="value-input-wrapper"
-                                style={{
-                                  visibility: tpl.enableValue
-                                    ? "visible"
-                                    : "hidden",
-                                }}
-                              >
-                                <input
-                                  type="number"
-                                  className="value-input"
-                                  value={inputValues[tpl.id] ?? ""}
-                                  onChange={(e) =>
-                                    handleValueChange(tpl.id, e.target.value)
-                                  }
-                                  onBlur={() => handleValueBlur(tpl.id)}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter")
-                                      (e.target as HTMLInputElement).blur();
-                                  }}
-                                  disabled={
-                                    !isAuthenticated || !tpl.enableValue
-                                  }
-                                />
-                                <span className="value-input-unit">시간</span>
-                              </div>
-                              <button
-                                type="button"
-                                className="btn"
-                                disabled={!isAuthenticated || !tpl.enableNote}
-                                style={{
-                                  visibility: tpl.enableNote
-                                    ? "visible"
-                                    : "hidden",
-                                }}
-                                onClick={() => {
-                                  if (!tpl.enableNote) return;
-                                  onSetMemoTarget({
-                                    kind: "template",
-                                    id: tpl.id,
-                                    title: tpl.title,
-                                    note: today?.note ?? null,
-                                  });
-                                }}
-                              >
-                                메모
-                              </button>
-                              <details
-                                className="menu"
-                                {...(!isAuthenticated && {
-                                  onClick: (e) => e.preventDefault(),
-                                })}
-                              >
-                                <summary
-                                  className="btn"
-                                  disabled={!isAuthenticated}
                                 >
-                                  ⋯
-                                </summary>
-                                <div className="menu-list">
-                                  <button
-                                    type="button"
-                                    className="menu-item"
-                                    onClick={() => {
-                                      const next = prompt("새 제목", tpl.title);
-                                      if (next)
-                                        mUpdateTpl.mutate({
-                                          id: tpl.id,
-                                          title: next,
-                                        });
-                                    }}
-                                  >
-                                    제목 수정
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="menu-item"
-                                    onClick={() => {
-                                      mUpdateTplFlags.mutate({
-                                        id: tpl.id,
-                                        data: { enableNote: !tpl.enableNote },
-                                      });
-                                    }}
-                                  >
-                                    {tpl.enableNote
-                                      ? "메모 작성 끄기"
-                                      : "메모 작성 켜기"}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="menu-item"
-                                    onClick={() => {
-                                      mUpdateTplFlags.mutate({
-                                        id: tpl.id,
-                                        data: { enableValue: !tpl.enableValue },
-                                      });
-                                    }}
-                                  >
-                                    {tpl.enableValue
-                                      ? "시간 작성 끄기"
-                                      : "시간 작성 켜기"}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="menu-item"
-                                    onClick={() => {
-                                      if (
-                                        confirm(
-                                          `'${tpl.title}' 루틴을 휴지통으로 이동하시겠습니까? (기록은 유지됩니다)`
-                                        )
-                                      ) {
-                                        mDeleteTpl.mutate(tpl.id);
-                                      }
-                                    }}
-                                  >
-                                    삭제 (보관)
-                                  </button>
-                                </div>
-                              </details>
-                            </div>
+                                  삭제 (보관)
+                                </button>
+                              </div>
+                            </details>
                           </div>
-                        </SortableRoutineItem>
-                      );
-                    })}
-                  </div>
+                        </div>
+                      </SortableRoutineItem>
+                    );
+                  })}
                 </div>
               </SortableContext>
-            </DndContext>
-          );
-        })}
+            </div>
+          ))}
+          <DragOverlay>
+            {activeTemplate ? (
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              >
+                <span className="drag-handle">⠿</span>
+                <div style={{ width: "100%" }}>
+                  <RoutineItem tpl={activeTemplate} byTplId={byTplId} />
+                </div>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
     </div>
   );

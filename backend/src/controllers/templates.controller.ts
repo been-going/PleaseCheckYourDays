@@ -30,7 +30,7 @@ export const reorderTemplates = async (req: Request, res: Response) => {
   if (!Array.isArray(updates)) {
     return res
       .status(400)
-      .json({ message: "updates must be an array of {id, order}." });
+      .json({ message: "updates must be an array of {id, order, group}." });
   }
   await templatesService.reorderTemplates(getUserIdFromRequest(req), updates);
   res.status(200).json({ message: "Reordered successfully." });

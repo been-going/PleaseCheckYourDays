@@ -182,7 +182,11 @@ export async function updateTemplate(
 }
 
 export async function reorderTemplates(
-  updates: { id: string; order: number }[]
+  updates: {
+    id: string;
+    order: number;
+    group: "MORNING" | "EXECUTE" | "EVENING";
+  }[]
 ): Promise<void> {
   await axiosInstance.patch("/templates/reorder", { updates });
 }

@@ -5,7 +5,7 @@ import { Template } from "@prisma/client";
 export const getActiveTemplates = (userId: string) =>
   prisma.template.findMany({
     where: { userId, isArchived: false },
-    orderBy: { order: "asc" },
+    orderBy: [{ group: "asc" }, { order: "asc" }],
   });
 
 export const getAllTemplates = (userId: string) =>
@@ -21,13 +21,13 @@ export const createTemplate = (
 
 export const reorderTemplates = async (
   userId: string,
-  updates: { id: string; order: number }[]
+  updates: { id: string; order: number; group: Template["group"] }[]
 ) => {
   // 트랜잭션을 사용하여 모든 업데이트가 성공하거나 하나라도 실패하면 모두 롤백되도록 합니다.
   const transaction = updates.map((update) =>
     prisma.template.updateMany({
       where: { id: update.id, userId }, // 사용자가 소유한 템플릿만 업데이트하도록 보장
-      data: { order: update.order },
+      data: { order: update.order, group: update.group },
     })
   );
   return prisma.$transaction(transaction);

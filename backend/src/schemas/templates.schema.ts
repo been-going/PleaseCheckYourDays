@@ -13,6 +13,7 @@ export const reorderTemplatesSchema = z.object({
       z.object({
         id: z.string().min(1, "ID는 필수입니다."),
         order: z.number().int(),
+        group: z.enum(["MORNING", "EXECUTE", "EVENING"]),
       })
     ),
   }),

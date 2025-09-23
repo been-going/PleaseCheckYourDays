@@ -5,11 +5,14 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import morgan from "morgan";
+import session from "express-session";
 import passport from "./config/passport.js";
 import apiRoutes from "./routes/index.js";
 import { errorHandler } from "./middleware/error.middleware.js";
 
 const app = express();
+
+const isProduction = process.env.NODE_ENV === "production";
 
 // --- Security Middlewares ---
 
@@ -47,10 +50,31 @@ app.use(morgan("dev"));
 app.use(express.json());
 app.use(cookieParser()); // Add cookie-parser to handle HttpOnly cookies
 app.use(express.urlencoded({ extended: true }));
-app.use(passport.initialize());
 
 // Nginx 같은 리버스 프록시 뒤에서 실행될 때, Express가 클라이언트 IP와 프로토콜을 신뢰하도록 설정합니다.
 app.set("trust proxy", 1);
+
+// Session Middleware - Passport보다 먼저 와야 합니다.
+app.use(
+  session({
+    // 중요: 환경 변수에서 강력한 비밀 키를 가져와 사용해야 합니다.
+    secret: process.env.COOKIE_SECRET || "dev-secret-key-for-local-use-only",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: isProduction, // 프로덕션에서는 true
+      sameSite: isProduction ? "lax" : "lax",
+      // www와 non-www 도메인 모두에서 쿠키가 동작하도록 설정
+      domain: isProduction ? ".please-check-your-days.cloud" : undefined,
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7일
+    },
+  })
+);
+
+// Passport Middleware
+app.use(passport.initialize());
+app.use(passport.session()); // 세션 기반 인증을 위해 필수
 
 // API Routes - 모든 API 경로는 /api 접두사를 갖습니다.
 app.use("/api", apiRoutes);

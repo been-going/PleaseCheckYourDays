@@ -67,7 +67,7 @@
 
 .item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
   padding: 0.75rem 1rem;
@@ -123,9 +123,15 @@
   font-size: 0.85rem;
   color: var(--text-secondary);
   margin-left: calc(18px + 0.75rem); /* checkbox width + gap */
-  white-space: nowrap;
+  word-break: break-word;
+
+  /* Limit the note preview to 2 lines with an ellipsis */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.4; /* Ensure consistent line spacing */
 }
 
 .item-note .task-value {
@@ -139,6 +145,7 @@
   gap: 0.5rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .drag-handle {
