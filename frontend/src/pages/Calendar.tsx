@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api";
 import type { DailyTask, Template as ITemplate } from "../api/client";
@@ -56,7 +56,7 @@ const CircularProgress = ({
         r={radius}
         cx={size / 2}
         cy={size / 2}
-        style={{ stroke: style.background }}
+        style={{ stroke: String(style.background ?? "transparent") }}
       />
       <text
         className="progress-text"
@@ -92,13 +92,25 @@ const DayDetails = ({
   const mToggleCheck = useMutation({
     mutationFn: (p: {
       id?: string;
-      templateId?: string;
+      templateId?: string | null;
       checked: boolean;
       dateYMD: string;
-    }) =>
-      p.id
-        ? api.updateTask(p.id, { checked: p.checked })
-        : api.upsertTaskFromTemplate({ ...p }),
+    }) => {
+      if (p.id) {
+        return api.updateTask(p.id, { checked: p.checked });
+      }
+      if (p.templateId) {
+        return api.upsertTaskFromTemplate({
+          templateId: p.templateId,
+          checked: p.checked,
+          dateYMD: p.dateYMD,
+        });
+      }
+      // This should ideally not be reached if logic is correct
+      return Promise.reject(
+        new Error("Cannot create a task without a templateId.")
+      );
+    },
     onSuccess: (_, variables) => {
       const from = localYMD(firstOfMonth(new Date(variables.dateYMD)));
       const to = localYMD(lastOfMonth(new Date(variables.dateYMD)));
@@ -197,7 +209,7 @@ const DayDetails = ({
             onChange={(e) =>
               mToggleCheck.mutate({
                 id: task.id.startsWith("placeholder-") ? undefined : task.id,
-                templateId: task.templateId ?? undefined,
+                templateId: task.templateId,
                 checked: e.target.checked,
                 dateYMD: selectedDate,
               })

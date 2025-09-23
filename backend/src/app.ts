@@ -19,18 +19,27 @@ const isProduction = process.env.NODE_ENV === "production";
 // 1. Set various security HTTP headers
 app.use(helmet());
 
+// 허용할 출처(origin) 목록입니다. 프로덕션 도메인과 www가 붙은 서브도메인을 모두 포함합니다.
 const allowedOrigins = [
   "http://localhost:5173", // 로컬 프론트엔드 개발 서버
+  "https://please-check-your-days.cloud",
+  "https://www.please-check-your-days.cloud",
 ];
-
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
-}
 
 // 2. Configure CORS for production to allow credentials
 const corsOptions = {
-  // 개발 및 프로덕션 환경의 출처를 모두 허용합니다.
-  origin: allowedOrigins,
+  // 요청의 Origin 헤더가 허용 목록에 있는지 동적으로 확인합니다.
+  origin: (
+    origin: string | undefined,
+    callback: (err: Error | null, allow?: boolean) => void
+  ) => {
+    // Postman과 같은 REST 클라이언트나 서버 간 요청에서는 origin이 없을 수 있습니다.
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true, // HttpOnly 쿠키를 주고받기 위해 필수
 };
 app.use(cors(corsOptions));
